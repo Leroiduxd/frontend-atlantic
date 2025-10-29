@@ -2,6 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useVault } from "@/hooks/useVault";
+import { useTrading } from "@/hooks/useTrading";
+import { useToast } from "@/hooks/use-toast";
+import { DepositDialog } from "./DepositDialog";
 
 type OrderType = "limit" | "market";
 
@@ -9,6 +13,58 @@ const OrderPanel = () => {
   const [orderType, setOrderType] = useState<OrderType>("limit");
   const [tpEnabled, setTpEnabled] = useState(false);
   const [slEnabled, setSlEnabled] = useState(false);
+  const [leverage, setLeverage] = useState(10);
+  const [lots, setLots] = useState(1);
+  const [limitPrice, setLimitPrice] = useState('');
+  const [tpPrice, setTpPrice] = useState('');
+  const [slPrice, setSlPrice] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const { balance, available, locked, refetchAll } = useVault();
+  const { openPosition } = useTrading();
+  const { toast } = useToast();
+
+  const handleTrade = async (longSide: boolean) => {
+    setLoading(true);
+    try {
+      const isLimit = orderType === 'limit';
+      const priceX6 = isLimit && limitPrice ? Math.round(Number(limitPrice) * 1000000) : 0;
+      const slX6 = slEnabled && slPrice ? Math.round(Number(slPrice) * 1000000) : 0;
+      const tpX6 = tpEnabled && tpPrice ? Math.round(Number(tpPrice) * 1000000) : 0;
+
+      await openPosition({
+        longSide,
+        leverageX: leverage,
+        lots,
+        isLimit,
+        priceX6,
+        slX6,
+        tpX6,
+      });
+
+      toast({
+        title: 'Order placed',
+        description: `${longSide ? 'Buy' : 'Sell'} order placed successfully`,
+      });
+
+      // Reset form
+      setLimitPrice('');
+      setTpPrice('');
+      setSlPrice('');
+      setTpEnabled(false);
+      setSlEnabled(false);
+
+      setTimeout(() => refetchAll(), 2000);
+    } catch (error: any) {
+      toast({
+        title: 'Order failed',
+        description: error?.message || 'Transaction failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="w-[320px] h-full flex flex-col border-l border-border shadow-md bg-card">
@@ -38,7 +94,17 @@ const OrderPanel = () => {
               Market
             </div>
           </div>
-          <div className="text-xs font-semibold text-foreground">Leverage: 10x</div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              value={leverage}
+              onChange={(e) => setLeverage(Math.min(100, Math.max(1, Number(e.target.value))))}
+              className="w-16 h-6 text-xs p-1 text-center"
+              min="1"
+              max="100"
+            />
+            <span className="text-xs font-semibold text-foreground">x</span>
+          </div>
         </div>
 
         {/* 2. Limit Price Input */}
@@ -46,29 +112,27 @@ const OrderPanel = () => {
           <div>
             <span className="text-light-text text-xs block mb-1">Limit Price (USD)</span>
             <Input
-              type="text"
+              type="number"
               placeholder="0.00"
+              value={limitPrice}
+              onChange={(e) => setLimitPrice(e.target.value)}
               className="w-full text-lg font-medium"
+              step="0.01"
             />
           </div>
         )}
 
-        {/* 3. Amount Input */}
+        {/* 3. Amount Input (Lots) */}
         <div>
-          <span className="text-light-text text-xs block mb-1">Amount</span>
-          <div className="relative">
-            <Input
-              type="text"
-              defaultValue="0.00"
-              className="w-full pr-16 text-lg font-medium"
-            />
-            <div className="absolute right-0 top-0 h-full flex items-center space-x-2 pr-3 text-sm font-semibold">
-              <span className="text-foreground cursor-pointer">BTC</span>
-              <span className="text-muted-foreground cursor-pointer border-l border-border pl-2">
-                USD
-              </span>
-            </div>
-          </div>
+          <span className="text-light-text text-xs block mb-1">Lots (1 lot = 0.01 BTC)</span>
+          <Input
+            type="number"
+            value={lots}
+            onChange={(e) => setLots(Math.max(1, Number(e.target.value)))}
+            className="w-full text-lg font-medium"
+            min="1"
+            step="1"
+          />
         </div>
 
         {/* 4. Percentage Buttons */}
@@ -100,9 +164,12 @@ const OrderPanel = () => {
             {tpEnabled && (
               <div>
                 <Input
-                  type="text"
+                  type="number"
                   placeholder="0.00"
+                  value={tpPrice}
+                  onChange={(e) => setTpPrice(e.target.value)}
                   className="w-full text-sm font-medium"
+                  step="0.01"
                 />
               </div>
             )}
@@ -121,9 +188,12 @@ const OrderPanel = () => {
             {slEnabled && (
               <div>
                 <Input
-                  type="text"
+                  type="number"
                   placeholder="0.00"
+                  value={slPrice}
+                  onChange={(e) => setSlPrice(e.target.value)}
                   className="w-full text-sm font-medium"
+                  step="0.01"
                 />
               </div>
             )}
@@ -132,11 +202,19 @@ const OrderPanel = () => {
 
         {/* 6. Buy / Sell Buttons */}
         <div className="flex space-x-3 pt-2 pb-3">
-          <Button className="flex-1 bg-trading-blue hover:bg-trading-blue/90 text-white font-bold shadow-md">
-            Buy
+          <Button
+            onClick={() => handleTrade(true)}
+            disabled={loading}
+            className="flex-1 bg-trading-blue hover:bg-trading-blue/90 text-white font-bold shadow-md"
+          >
+            {loading ? 'Processing...' : 'Buy'}
           </Button>
-          <Button className="flex-1 bg-trading-red hover:bg-trading-red/90 text-white font-bold shadow-md">
-            Sell
+          <Button
+            onClick={() => handleTrade(false)}
+            disabled={loading}
+            className="flex-1 bg-trading-red hover:bg-trading-red/90 text-white font-bold shadow-md"
+          >
+            {loading ? 'Processing...' : 'Sell'}
           </Button>
         </div>
 
@@ -159,35 +237,25 @@ const OrderPanel = () => {
         {/* 8. Trading Account Balance */}
         <div className="flex justify-between items-center pt-2">
           <span className="text-sm font-semibold text-foreground">Trading Account</span>
-          <span className="text-sm font-bold text-primary">$18,224.34</span>
+          <span className="text-sm font-bold text-primary">${balance}</span>
         </div>
         <div className="flex justify-end pt-0">
-          <Button variant="secondary" size="sm" className="text-xs font-semibold">
-            Deposit
-          </Button>
+          <DepositDialog />
         </div>
 
         {/* 9. Account Details (Second Block) */}
         <div className="text-sm space-y-1.5 pt-2">
           <div className="flex justify-between text-light-text">
-            <span>Equity</span>
-            <span className="text-foreground">$18,224.34</span>
+            <span>Balance (Total)</span>
+            <span className="text-foreground">${balance}</span>
           </div>
           <div className="flex justify-between text-light-text">
             <span>Available Balance</span>
-            <span className="text-foreground">$18,224.34</span>
+            <span className="text-foreground">${available}</span>
           </div>
           <div className="flex justify-between text-light-text">
-            <span>Margin Health</span>
-            <span className="text-foreground">$0</span>
-          </div>
-          <div className="flex justify-between text-light-text">
-            <span>Maintenance Margin</span>
-            <span className="text-foreground">$0</span>
-          </div>
-          <div className="flex justify-between text-light-text">
-            <span>Total Account Leverage</span>
-            <span className="text-foreground">14x</span>
+            <span>Locked (Margin)</span>
+            <span className="text-foreground">${locked}</span>
           </div>
         </div>
       </div>
