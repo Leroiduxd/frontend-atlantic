@@ -1,13 +1,20 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { usePositions } from "@/hooks/usePositions";
+import { useTrading } from "@/hooks/useTrading";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { EditStopsDialog } from "./EditStopsDialog";
 
 type TabType = "openPositions" | "pendingOrders" | "closedPositions" | "cancelledOrders";
 
 const PositionsSection = () => {
   const [activeTab, setActiveTab] = useState<TabType>("openPositions");
-  const { positions, orders, closedPositions, cancelledOrders } = usePositions();
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<any>(null);
+  const { positions, orders, closedPositions, cancelledOrders, refetch } = usePositions();
+  const { cancelOrder, updateStops, closePosition } = useTrading();
+  const { toast } = useToast();
 
   const formatPrice = (value: number) => {
     return (value / 1000000).toFixed(2);
@@ -19,6 +26,64 @@ const PositionsSection = () => {
     } catch {
       return dateStr;
     }
+  };
+
+  const handleCancelOrder = async (id: number) => {
+    try {
+      await cancelOrder(id);
+      toast({
+        title: "Order cancelled",
+        description: "Your order has been cancelled successfully",
+      });
+      setTimeout(() => refetch(), 2000);
+    } catch (error: any) {
+      toast({
+        title: "Failed to cancel",
+        description: error?.message || "Transaction failed",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleClosePosition = async (id: number) => {
+    try {
+      await closePosition(id);
+      toast({
+        title: "Position closed",
+        description: "Your position has been closed successfully",
+      });
+      setTimeout(() => refetch(), 2000);
+    } catch (error: any) {
+      toast({
+        title: "Failed to close",
+        description: error?.message || "Transaction failed",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateStops = async (id: number, slPrice: string, tpPrice: string) => {
+    try {
+      const slX6 = slPrice ? Math.round(Number(slPrice) * 1000000) : 0;
+      const tpX6 = tpPrice ? Math.round(Number(tpPrice) * 1000000) : 0;
+      await updateStops(id, slX6, tpX6);
+      toast({
+        title: "TP/SL updated",
+        description: "Your stop loss and take profit have been updated",
+      });
+      setTimeout(() => refetch(), 2000);
+    } catch (error: any) {
+      toast({
+        title: "Failed to update",
+        description: error?.message || "Transaction failed",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openEditDialog = (position: any) => {
+    setSelectedPosition(position);
+    setEditDialogOpen(true);
   };
 
   const tabConfig = [
@@ -113,10 +178,14 @@ const PositionsSection = () => {
                       SL: {position.sl_x6 ? formatPrice(position.sl_x6) : 'N/A'}
                     </td>
                     <td className="pr-4 pl-3 py-2 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                      <button className="text-trading-blue hover:text-trading-blue/80 text-xs">
+                      <button 
+                        onClick={() => openEditDialog(position)}
+                        className="text-trading-blue hover:text-trading-blue/80 text-xs"
+                      >
                         Edit TP/SL
                       </button>
                       <Button
+                        onClick={() => handleClosePosition(position.id)}
                         size="sm"
                         className="bg-trading-red/10 text-trading-red hover:bg-trading-red/20 text-xs font-semibold"
                       >
@@ -186,6 +255,7 @@ const PositionsSection = () => {
                     </td>
                     <td className="pr-4 pl-3 py-2 whitespace-nowrap text-right text-sm font-medium">
                       <Button
+                        onClick={() => handleCancelOrder(order.id)}
                         variant="secondary"
                         size="sm"
                         className="text-xs font-semibold"
@@ -310,6 +380,18 @@ const PositionsSection = () => {
           </div>
         )}
       </div>
+
+      {/* Edit Stops Dialog */}
+      {selectedPosition && (
+        <EditStopsDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          positionId={selectedPosition.id}
+          currentSL={selectedPosition.sl_x6}
+          currentTP={selectedPosition.tp_x6}
+          onConfirm={handleUpdateStops}
+        />
+      )}
     </section>
   );
 };

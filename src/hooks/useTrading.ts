@@ -40,7 +40,55 @@ export const useTrading = () => {
     return hash;
   };
 
+  const cancelOrder = async (id: number) => {
+    if (!address) throw new Error('No wallet connected');
+
+    const hash = await writeContractAsync({
+      address: TRADING_ADDRESS,
+      abi: TRADING_ABI,
+      functionName: 'cancel',
+      args: [id],
+      account: address,
+      chain: customChain,
+    });
+
+    return hash;
+  };
+
+  const updateStops = async (id: number, slX6: number, tpX6: number) => {
+    if (!address) throw new Error('No wallet connected');
+
+    const hash = await writeContractAsync({
+      address: TRADING_ADDRESS,
+      abi: TRADING_ABI,
+      functionName: 'updateStops',
+      args: [id, BigInt(slX6), BigInt(tpX6)],
+      account: address,
+      chain: customChain,
+    });
+
+    return hash;
+  };
+
+  const closePosition = async (id: number) => {
+    if (!address) throw new Error('No wallet connected');
+
+    const hash = await writeContractAsync({
+      address: TRADING_ADDRESS,
+      abi: TRADING_ABI,
+      functionName: 'close',
+      args: [id],
+      account: address,
+      chain: customChain,
+    });
+
+    return hash;
+  };
+
   return {
     openPosition,
+    cancelOrder,
+    updateStops,
+    closePosition,
   };
 };

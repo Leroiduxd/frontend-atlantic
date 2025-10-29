@@ -12,10 +12,10 @@ export const customChain = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://rpc.customchain.network'], // Replace with actual RPC URL
+      http: ['https://atlantic.dplabs-internal.com'],
     },
     public: {
-      http: ['https://rpc.customchain.network'], // Replace with actual RPC URL
+      http: ['https://atlantic.dplabs-internal.com'],
     },
   },
   blockExplorers: {

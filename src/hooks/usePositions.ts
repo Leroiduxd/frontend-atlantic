@@ -94,5 +94,43 @@ export const usePositions = () => {
     return () => clearInterval(interval);
   }, [address]);
 
-  return { positions, orders, closedPositions, cancelledOrders, loading };
+  const refetch = async () => {
+    if (!address) return;
+
+    try {
+      const traderResponse = await fetch(`https://api.brokex.trade/trader/${address}`);
+      const traderData: TraderData = await traderResponse.json();
+
+      const fetchPositionDetails = async (ids: number[]) => {
+        const details = await Promise.all(
+          ids.map(async (id) => {
+            try {
+              const response = await fetch(`https://api.brokex.trade/position/${id}`);
+              return await response.json();
+            } catch (error) {
+              console.error(`Error fetching position ${id}:`, error);
+              return null;
+            }
+          })
+        );
+        return details.filter(Boolean);
+      };
+
+      const [openPos, pendingOrd, closedPos, cancelledOrd] = await Promise.all([
+        fetchPositionDetails(traderData.open),
+        fetchPositionDetails(traderData.orders),
+        fetchPositionDetails(traderData.closed),
+        fetchPositionDetails(traderData.cancelled),
+      ]);
+
+      setPositions(openPos);
+      setOrders(pendingOrd);
+      setClosedPositions(closedPos);
+      setCancelledOrders(cancelledOrd);
+    } catch (error) {
+      console.error('Error fetching positions:', error);
+    }
+  };
+
+  return { positions, orders, closedPositions, cancelledOrders, loading, refetch };
 };

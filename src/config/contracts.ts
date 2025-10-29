@@ -96,4 +96,29 @@ export const TRADING_ABI = [
     stateMutability: 'nonpayable',
     type: 'function',
   },
+  {
+    inputs: [{ internalType: 'uint32', name: 'id', type: 'uint32' }],
+    name: 'cancel',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'uint32', name: 'id', type: 'uint32' },
+      { internalType: 'int64', name: 'newSLx6', type: 'int64' },
+      { internalType: 'int64', name: 'newTPx6', type: 'int64' },
+    ],
+    name: 'updateStops',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'uint32', name: 'id', type: 'uint32' }],
+    name: 'close',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
 ] as const;
