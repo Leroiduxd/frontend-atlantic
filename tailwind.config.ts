@@ -57,6 +57,13 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        "trading-green": "hsl(var(--trading-green))",
+        "trading-red": "hsl(var(--trading-red))",
+        "trading-blue": "hsl(var(--trading-blue))",
+        "light-text": "hsl(var(--light-text))",
+        "chart-bg": "hsl(var(--chart-bg))",
+        "hover-bg": "hsl(var(--hover-bg))",
+        "active-tab": "hsl(var(--active-tab))",
       },
       borderRadius: {
         lg: "var(--radius)",
