@@ -9,14 +9,14 @@ interface ChartData {
   close: string;
 }
 
-export const useChartData = () => {
+export const useChartData = (pair: number = 0, interval: string = "300") => {
   const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('https://chart.brokex.trade/history?pair=0&interval=300');
+        const response = await fetch(`https://chart.brokex.trade/history?pair=${pair}&interval=${interval}`);
         const result = await response.json();
         setData(result);
       } catch (error) {
@@ -27,10 +27,10 @@ export const useChartData = () => {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 30000);
+    const intervalId = setInterval(fetchData, 30000);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => clearInterval(intervalId);
+  }, [pair, interval]);
 
   return { data, loading };
 };

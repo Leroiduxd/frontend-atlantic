@@ -189,7 +189,7 @@ export const LightweightChart = ({ data, positions = [] }: LightweightChartProps
   }, [positions]);
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-[calc(100%-3rem)] relative">
       <div ref={chartContainerRef} className="w-full h-full" />
       {data.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center">
