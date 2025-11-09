@@ -40,8 +40,8 @@ const TIMEFRAMES = [
 
 // 🛑 CORRECTION: Les deux réseaux sont des Testnets.
 const NETWORKS = [
-    { name: "Atlantic", status: "Testnet", url: "https://atlantic.brokex.trade" },
-    { name: "Old Testnet", status: "Testnet", url: "https://app.brokex.trade" },
+    { name: "Atlantic", status: "Testnet", url: "https://app.brokex.trade" },
+    { name: "Old Testnet", status: "Testnet", url: "https://testnet.brokex.trade" },
 ];
 
 export const ChartControls = (props: ChartControlsProps) => {
