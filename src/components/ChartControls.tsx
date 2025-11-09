@@ -4,7 +4,7 @@ import {
   DialogContent,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Globe } from "lucide-react";
 import { useWebSocket, getAssetsByCategory } from "@/hooks/useWebSocket";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,6 +38,12 @@ const TIMEFRAMES = [
   { value: "86400", label: "1D" },
 ];
 
+// 🛑 CORRECTION: Les deux réseaux sont des Testnets.
+const NETWORKS = [
+    { name: "Atlantic", status: "Testnet", url: "https://atlantic.brokex.trade" },
+    { name: "Old Testnet", status: "Testnet", url: "https://app.brokex.trade" },
+];
+
 export const ChartControls = (props: ChartControlsProps) => {
   const { 
     selectedAsset, 
@@ -53,6 +59,8 @@ export const ChartControls = (props: ChartControlsProps) => {
   const categories = getAssetsByCategory(wsData);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isNetworkDialogOpen, setIsNetworkDialogOpen] = useState(false); // État pour la modale réseau
+  const [selectedNetwork, setSelectedNetwork] = useState(NETWORKS[0]); 
 
   const handleAssetChange = (asset: any) => {
     // FIX 4: Normalization: 0 is valid, use -1 for invalid IDs.
@@ -83,205 +91,179 @@ export const ChartControls = (props: ChartControlsProps) => {
 
   return (
     <div className="absolute bottom-0 left-0 right-0 h-12 bg-chart-bg border-t border-border flex items-center justify-between px-4 gap-4">
-      {/* Asset Selector */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            className="gap-2 font-semibold text-base hover:bg-accent"
-          >
-            {selectedAsset.symbol}
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-        </DialogTrigger>
-        
-        <DialogContent className="w-[600px] h-[500px] max-w-none p-0 bg-background z-50 overflow-hidden flex flex-col">
-          <Tabs defaultValue="crypto" className="w-full h-full flex flex-col">
-            <TabsList className="w-full grid grid-cols-5 rounded-none border-b flex-shrink-0">
-              <TabsTrigger value="crypto" className="text-xs">Crypto</TabsTrigger>
-              <TabsTrigger value="forex" className="text-xs">Forex</TabsTrigger>
-              <TabsTrigger value="commodities" className="text-xs">Commodities</TabsTrigger>
-              <TabsTrigger value="stocks" className="text-xs">Stocks</TabsTrigger>
-              <TabsTrigger value="indices" className="text-xs">Indices</TabsTrigger>
-            </TabsList>
+      
+      {/* Group 1: Asset Selector & Price Info */}
+      <div className="flex items-center gap-4">
+          {/* Asset Selector */}
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                className="gap-2 font-semibold text-base hover:bg-accent"
+              >
+                {selectedAsset.symbol}
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
             
-            <ScrollArea className="flex-1">
-              {/* Crypto Tab */}
-              <TabsContent value="crypto" className="m-0 p-2">
-                <div className="space-y-1">
-                  {categories.crypto.length > 0 ? (
-                    categories.crypto.map((asset) => (
-                      <Button
-                        key={asset.id}
-                        variant={selectedAsset.id === asset.id ? "secondary" : "ghost"}
-                        className="w-full justify-between h-auto py-2"
-                        onClick={() => handleAssetChange(asset)}
-                      >
-                        <div className="flex flex-col items-start">
-                          <span className="font-semibold text-sm">{asset.symbol}</span>
-                          <span className="text-xs text-muted-foreground">{asset.name}</span>
+            <DialogContent className="w-[600px] h-[500px] max-w-none p-0 bg-background z-50 overflow-hidden flex flex-col">
+              <Tabs defaultValue="crypto" className="w-full h-full flex flex-col">
+                <TabsList className="w-full grid grid-cols-5 rounded-none border-b flex-shrink-0">
+                  <TabsTrigger value="crypto" className="text-xs">Crypto</TabsTrigger>
+                  <TabsTrigger value="forex" className="text-xs">Forex</TabsTrigger>
+                  <TabsTrigger value="commodities" className="text-xs">Commodities</TabsTrigger>
+                  <TabsTrigger value="stocks" className="text-xs">Stocks</TabsTrigger>
+                  <TabsTrigger value="indices" className="text-xs">Indices</TabsTrigger>
+                </TabsList>
+                
+                <ScrollArea className="flex-1">
+                  {/* Mapping des catégories d'actifs (inchangé) */}
+                  {Object.keys(categories).map((key) => {
+                    const category = key as keyof typeof categories;
+                    return (
+                      <TabsContent key={key} value={key} className="m-0 p-2">
+                        <div className="space-y-1">
+                          {categories[category].length > 0 ? (
+                            categories[category].map((asset) => (
+                              <Button
+                                key={asset.id}
+                                variant={selectedAsset.id === asset.id ? "secondary" : "ghost"}
+                                className="w-full justify-between h-auto py-2"
+                                onClick={() => handleAssetChange(asset)}
+                              >
+                                <div className="flex flex-col items-start">
+                                  <span className="font-semibold text-sm">{asset.symbol}</span>
+                                  <span className="text-xs text-muted-foreground">{asset.name}</span>
+                                </div>
+                                <div className="flex flex-col items-end">
+                                  <span className="text-sm">{formatPrice(parseFloat(asset.currentPrice || '0'))}</span>
+                                  <span className={`text-xs font-semibold ${parseFloat(asset.change24h || '0') >= 0 ? 'text-trading-blue' : 'text-trading-red'}`}>
+                                    {parseFloat(asset.change24h || '0') >= 0 ? '+' : ''}{parseFloat(asset.change24h || '0').toFixed(2)}%
+                                  </span>
+                                </div>
+                              </Button>
+                            ))
+                          ) : (
+                            <div className="text-center text-muted-foreground py-4">No assets available</div>
+                          )}
                         </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-sm">{formatPrice(parseFloat(asset.currentPrice || '0'))}</span>
-                          <span className={`text-xs font-semibold ${parseFloat(asset.change24h || '0') >= 0 ? 'text-trading-blue' : 'text-trading-red'}`}>
-                            {parseFloat(asset.change24h || '0') >= 0 ? '+' : ''}{parseFloat(asset.change24h || '0').toFixed(2)}%
-                          </span>
-                        </div>
-                      </Button>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted-foreground py-4">No assets available</div>
-                  )}
-                </div>
-              </TabsContent>
-              
-              {/* Forex Tab */}
-              <TabsContent value="forex" className="m-0 p-2">
-                <div className="space-y-1">
-                  {categories.forex.length > 0 ? (
-                    categories.forex.map((asset) => (
-                      <Button
-                        key={asset.id}
-                        variant={selectedAsset.id === asset.id ? "secondary" : "ghost"}
-                        className="w-full justify-between h-auto py-2"
-                        onClick={() => handleAssetChange(asset)}
-                      >
-                        <div className="flex flex-col items-start">
-                          <span className="font-semibold text-sm">{asset.symbol}</span>
-                          <span className="text-xs text-muted-foreground">{asset.name}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-sm">{formatPrice(parseFloat(asset.currentPrice || '0'))}</span>
-                          <span className={`text-xs font-semibold ${parseFloat(asset.change24h || '0') >= 0 ? 'text-trading-blue' : 'text-trading-red'}`}>
-                            {parseFloat(asset.change24h || '0') >= 0 ? '+' : ''}{parseFloat(asset.change24h || '0').toFixed(2)}%
-                          </span>
-                        </div>
-                      </Button>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted-foreground py-4">No assets available</div>
-                  )}
-                </div>
-              </TabsContent>
+                      </TabsContent>
+                    );
+                  })}
+                </ScrollArea>
+              </Tabs>
+            </DialogContent>
+          </Dialog>
 
-              {/* Commodities Tab */}
-              <TabsContent value="commodities" className="m-0 p-2">
-                <div className="space-y-1">
-                  {categories.commodities.length > 0 ? (
-                    categories.commodities.map((asset) => (
-                      <Button
-                        key={asset.id}
-                        variant={selectedAsset.id === asset.id ? "secondary" : "ghost"}
-                        className="w-full justify-between h-auto py-2"
-                        onClick={() => handleAssetChange(asset)}
-                      >
-                        <div className="flex flex-col items-start">
-                          <span className="font-semibold text-sm">{asset.symbol}</span>
-                          <span className="text-xs text-muted-foreground">{asset.name}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-sm">{formatPrice(parseFloat(asset.currentPrice || '0'))}</span>
-                          <span className={`text-xs font-semibold ${parseFloat(asset.change24h || '0') >= 0 ? 'text-trading-blue' : 'text-trading-red'}`}>
-                            {parseFloat(asset.change24h || '0') >= 0 ? '+' : ''}{parseFloat(asset.change24h || '0').toFixed(2)}%
-                          </span>
-                        </div>
-                      </Button>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted-foreground py-4">No assets available</div>
-                  )}
-                </div>
-              </TabsContent>
-
-              {/* Stocks Tab */}
-              <TabsContent value="stocks" className="m-0 p-2">
-                <div className="space-y-1">
-                  {categories.stocks.length > 0 ? (
-                    categories.stocks.map((asset) => (
-                      <Button
-                        key={asset.id}
-                        variant={selectedAsset.id === asset.id ? "secondary" : "ghost"}
-                        className="w-full justify-between h-auto py-2"
-                        onClick={() => handleAssetChange(asset)}
-                      >
-                        <div className="flex flex-col items-start">
-                          <span className="font-semibold text-sm">{asset.symbol}</span>
-                          <span className="text-xs text-muted-foreground">{asset.name}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-sm">{formatPrice(parseFloat(asset.currentPrice || '0'))}</span>
-                          <span className={`text-xs font-semibold ${parseFloat(asset.change24h || '0') >= 0 ? 'text-trading-blue' : 'text-trading-red'}`}>
-                            {parseFloat(asset.change24h || '0') >= 0 ? '+' : ''}{parseFloat(asset.change24h || '0').toFixed(2)}%
-                          </span>
-                        </div>
-                      </Button>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted-foreground py-4">No assets available</div>
-                  )}
-                </div>
-              </TabsContent>
-              
-              {/* Indices Tab */}
-              <TabsContent value="indices" className="m-0 p-2">
-                <div className="space-y-1">
-                  {categories.indices.length > 0 ? (
-                    categories.indices.map((asset) => (
-                      <Button
-                        key={asset.id}
-                        variant={selectedAsset.id === asset.id ? "secondary" : "ghost"}
-                        className="w-full justify-between h-auto py-2"
-                        onClick={() => handleAssetChange(asset)}
-                      >
-                        <div className="flex flex-col items-start">
-                          <span className="font-semibold text-sm">{asset.symbol}</span>
-                          <span className="text-xs text-muted-foreground">{asset.name}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-sm">{formatPrice(parseFloat(asset.currentPrice || '0'))}</span>
-                          <span className={`text-xs font-semibold ${parseFloat(asset.change24h || '0') >= 0 ? 'text-trading-blue' : 'text-trading-red'}`}>
-                            {parseFloat(asset.change24h || '0') >= 0 ? '+' : ''}{parseFloat(asset.change24h || '0').toFixed(2)}%
-                          </span>
-                        </div>
-                      </Button>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted-foreground py-4">No assets available</div>
-                  )}
-                </div>
-              </TabsContent>
-            </ScrollArea>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
-      {/* Fin de la section Dialog */}
-
-      {/* Price Info */}
-      <div className="flex items-center gap-3">
-        <span className="font-semibold text-base">{formatPrice(currentPrice)}</span>
-        <span
-          className={`text-sm font-semibold ${
-            isPositive ? "text-trading-blue" : "text-trading-red"
-          }`}
-        >
-          {isPositive ? "+" : ""}
-          {parseFloat(selectedAsset.change24h || '0').toFixed(2)}%
-        </span>
+          {/* Price Info */}
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-base">{formatPrice(currentPrice)}</span>
+            <span
+              className={`text-sm font-semibold ${
+                isPositive ? "text-trading-blue" : "text-trading-red"
+              }`}
+            >
+              {isPositive ? "+" : ""}
+              {parseFloat(selectedAsset.change24h || '0').toFixed(2)}%
+            </span>
+          </div>
       </div>
 
-      {/* Timeframe Selector */}
-      <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-        {TIMEFRAMES.map((tf) => (
-          <Button
-            key={tf.value}
-            variant={selectedTimeframe === tf.value ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 px-3 text-xs"
-            onClick={() => onTimeframeChange(tf.value)}
-          >
-            {tf.label}
-          </Button>
-        ))}
+
+      {/* Group 2: Timeframe Selector & Network Selector (Right Side) */}
+      <div className="flex items-center gap-4">
+          
+          {/* Timeframe Selector */}
+          <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+            {TIMEFRAMES.map((tf) => (
+              <Button
+                key={tf.value}
+                variant={selectedTimeframe === tf.value ? "secondary" : "ghost"}
+                size="sm"
+                // AJOUT DU GRAS POUR LA SÉLECTION
+                className={`h-7 px-3 text-xs ${selectedTimeframe === tf.value ? 'font-bold' : 'font-medium'}`}
+                onClick={() => onTimeframeChange(tf.value)}
+              >
+                {tf.label}
+              </Button>
+            ))}
+          </div>
+
+          {/* NOUVEAU: Network Selector */}
+          <Dialog open={isNetworkDialogOpen} onOpenChange={setIsNetworkDialogOpen}>
+              <DialogTrigger asChild>
+                  <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 h-7 px-3 text-xs font-semibold"
+                  >
+                      {/* 🛑 UTILISATION DE L'IMAGE POUR L'ICÔNE */}
+                      <img 
+                          src="public/icon.png" 
+                          alt="Network Icon" 
+                          className="w-4 h-4 rounded-full" 
+                      />
+                      {selectedNetwork.name}
+                      <ChevronDown className="h-3 w-3" />
+                  </Button>
+              </DialogTrigger>
+              <DialogContent className="w-[300px] p-0 bg-background">
+                  <div className="p-4 space-y-2">
+                      <h4 className="text-sm font-semibold text-muted-foreground uppercase">Network Status</h4>
+                      
+                      {NETWORKS.map((network) => {
+                          const isCurrent = selectedNetwork.name === network.name;
+
+                          const networkContent = (
+                            <div className="flex justify-between items-center w-full">
+                                <div className="flex flex-col items-start">
+                                    <span className="font-semibold">{network.name}</span>
+                                    <span className={`text-xs text-trading-blue`}>
+                                        {network.status}
+                                    </span>
+                                </div>
+                                
+                                {isCurrent ? (
+                                    <span className="text-xs text-green-500 font-medium">
+                                        Current
+                                    </span>
+                                ) : (
+                                    <span className="text-xs text-muted-foreground hover:underline">
+                                        app.brokex.trade
+                                    </span>
+                                )}
+                            </div>
+                          );
+
+                          if (isCurrent) {
+                              // 🛑 Action: Fermer la modale (onClick est appelé par le onOpenChange de la Dialog)
+                              return (
+                                  <div
+                                      key={network.name}
+                                      className={`p-3 rounded-lg flex items-center cursor-pointer transition-colors bg-accent border border-trading-blue`}
+                                      onClick={() => setIsNetworkDialogOpen(false)} 
+                                  >
+                                      {networkContent}
+                                  </div>
+                              );
+                          } else {
+                              // 🛑 Action: Naviguer vers l'autre Testnet
+                              return (
+                                  <a
+                                      key={network.name}
+                                      href={network.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`p-3 rounded-lg flex items-center cursor-pointer transition-colors hover:bg-muted`}
+                                  >
+                                      {networkContent}
+                                  </a>
+                              );
+                          }
+                      })}
+                  </div>
+              </DialogContent>
+          </Dialog>
       </div>
     </div>
   );
