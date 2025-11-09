@@ -7,13 +7,17 @@ import { useToast } from "@/hooks/use-toast";
 import { DepositDialog } from "./DepositDialog";
 import { Asset } from "./ChartControls";
 import { useAssetConfig } from "@/hooks/useAssetConfig";
+import { MarketClosedBanner } from "./MarketClosedBanner"; // 🛑 IMPORT DU NOUVEAU COMPOSANT
 // Wagmi/Viem Imports
 import { useWriteContract, useConfig } from 'wagmi'; 
 import { Landmark, Send } from "lucide-react"; 
 import { ChevronUp, ChevronDown } from "lucide-react"; 
-import { Hash } from 'viem'; // Importation du type Hash de viem
+import { Hash } from 'viem'; 
 
-// --- CONSTANTES GLOBALES (Assurez-vous que celles-ci sont correctement importées ou déclarées) ---
+// Import du hook de statut de marché
+import { useMarketStatus } from "@/hooks/useMarketStatus";
+
+// --- CONSTANTES GLOBALES (Unchanged) ---
 const VAULT_ADDRESS = '0x19e9e0c71b672aaaadee26532da80d330399fa11' as const;
 const TOKEN_ADDRESS = '0x16b90aeb3de140dde993da1d5734bca28574702b' as const;
 const TRADING_ADDRESS = '0xb449fd01fa7937d146e867b995c261e33c619292' as const;
@@ -51,9 +55,7 @@ const TRADING_ABI = [
 ] as const;
 // ---------------------------------------------------
 
-// ====================================================================
-// COMPOSANT : StepController (Inchangé)
-// ====================================================================
+// (StepController remains unchanged)
 interface StepControllerProps {
     value: string | number;
     onChange: (value: any) => void;
@@ -106,9 +108,9 @@ interface OrderPanelProps {
   currentPrice: number;
 }
 
-// 🛑 FONCTION UTILITAIRE : Récupérer la Preuve (plus robuste)
+// UTILITY FUNCTION: Fetch Proof (more robust)
 const getMarketProof = async (assetId: number): Promise<Hash> => {
-    const url = `https://proof.brokex.trade/proof?pairs=${assetId}`;
+    const url = `https://backend.brokex.trade/proof?pairs=${assetId}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -122,9 +124,9 @@ const getMarketProof = async (assetId: number): Promise<Hash> => {
          throw new Error("Invalid proof received from API.");
     }
 
-    // Retourne le type Hash de viem qui est `0x${string}`
     return proof as Hash; 
 };
+
 
 const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
   const [orderType, setOrderType] = useState<OrderType>("limit");
@@ -146,8 +148,20 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
   const publicClient = config.publicClient; 
   
   const finalAssetIdForTx = useMemo(() => {
-    return Number(selectedAsset.id) || 0; 
+    const n = Number(selectedAsset.id);
+    return Number.isFinite(n) ? n : -1;
   }, [selectedAsset.id]);
+
+  // 🛑 UTILISATION DU HOOK DE STATUT DE MARCHÉ
+  const marketStatus = useMarketStatus(finalAssetIdForTx);
+  const isMarketOpen = marketStatus.isOpen;
+  
+  // Si le marché est fermé, forcer l'ordre Limit
+  useEffect(() => {
+    if (!isMarketOpen && orderType === "market") {
+      setOrderType("limit");
+    }
+  }, [isMarketOpen, orderType]);
 
   const assetConfig = getConfigById(finalAssetIdForTx); 
 
@@ -174,7 +188,7 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
 
   useEffect(() => {
     setLotsDisplay(minLotSizeDisplay); 
-    if (currentPrice > 0 && selectedAsset.id) {
+    if (currentPrice > 0) {
         // Mise à jour de limitPrice uniquement si on est sur Limit au montage
         if (orderType === 'limit') {
             setLimitPrice(currentPrice.toFixed(priceDecimals));
@@ -200,7 +214,7 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
     
     // La liq price est calculée par rapport au prix d'entrée
     const liqPriceLong = price * (1 - 0.99 / leverage);
-    const liqPriceShort = price * (1 + 0.99 / leverage); // Correction de la formule de liq short
+    const liqPriceShort = price * (1 + 0.99 / leverage); 
 
     return {
       value: displayNotional,
@@ -218,9 +232,18 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
 
   const handleTrade = async (longSide: boolean) => {
     
-    // --- 1. VÉRIFICATIONS CRITIQUES ---
-    if (finalAssetIdForTx === 0) {
-        return toast({ title: 'Erreur de Configuration', description: `Veuillez sélectionner une paire valide.`, variant: "destructive", });
+    // --- 0. MARKET STATUS CHECK ---
+    if (!isMarketOpen && orderType === 'market') {
+      return toast({ 
+        title: 'Market Closed', 
+        description: `Market orders are disabled when the market is closed. Please use a Limit order.`, 
+        variant: "destructive" 
+      });
+    }
+
+    // --- 1. CRITICAL CHECKS ---
+    if (finalAssetIdForTx < 0) {
+        return toast({ title: 'Configuration Error', description: `Please select a valid trading pair.`, variant: "destructive", });
     }
     
     const numLimitPrice = Number(limitPrice);
@@ -228,58 +251,58 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
     const numTpPrice = Number(tpPrice);
     
     if (orderType === 'limit' && (isNaN(numLimitPrice) || numLimitPrice <= 0)) {
-        return toast({ title: 'Erreur de Saisie', description: 'Veuillez saisir un Prix Limite valide.', variant: "destructive" });
+        return toast({ title: 'Input Error', description: 'Please enter a valid Limit Price.', variant: "destructive" });
     }
-    // Validation du lot
+    // Lot validation
     if (lotsDisplay < minLotSizeDisplay) {
-        return toast({ title: 'Erreur de Saisie', description: `Le montant minimum est ${minLotSizeDisplay}.`, variant: "destructive" });
+        return toast({ title: 'Input Error', description: `Minimum lot size is ${minLotSizeDisplay}.`, variant: "destructive" });
     }
 
-    // VÉRIFICATION : SOLDE DISPONIBLE
+    // CHECK: AVAILABLE BALANCE
     const requiredMargin = calculations.cost;
-    const requiredMarginWithBuffer = requiredMargin * 1.01; // Marge + 1%
+    const requiredMarginWithBuffer = requiredMargin * 1.01; // Margin + 1%
     const availableBalance = Number(available); 
 
     if (availableBalance < requiredMarginWithBuffer) {
         return toast({
-            title: 'Solde Insuffisant',
-            description: `Marge requise: $${formatPrice(requiredMarginWithBuffer)}. Disponible: $${availableBalance}.`,
+            title: 'Insufficient Balance',
+            description: `Required Margin: $${formatPrice(requiredMarginWithBuffer)}. Available: $${availableBalance}.`,
             variant: "destructive",
         });
     }
 
-    // 2. VALIDATION SL/TP
+    // 2. SL/TP VALIDATION
     const entryPrice = orderType === 'limit' ? numLimitPrice : currentPrice;
     const liqPrice = longSide 
         ? entryPrice * (1 - 0.99 / leverage) 
         : entryPrice * (1 + 0.99 / leverage);
 
     if (slEnabled && (isNaN(numSlPrice) || numSlPrice <= 0)) {
-        return toast({ title: 'Erreur de Saisie', description: 'Veuillez saisir un Prix Stop Loss valide.', variant: "destructive" });
+        return toast({ title: 'Input Error', description: 'Please enter a valid Stop Loss Price.', variant: "destructive" });
     }
     if (tpEnabled && (isNaN(numTpPrice) || numTpPrice <= 0)) {
-        return toast({ title: 'Erreur de Saisie', description: 'Veuillez saisir un Prix Take Profit valide.', variant: "destructive" });
+        return toast({ title: 'Input Error', description: 'Please enter a valid Take Profit Price.', variant: "destructive" });
     }
 
     if (slEnabled) {
       if ((longSide && numSlPrice <= liqPrice) || (!longSide && numSlPrice >= liqPrice)) {
-        return toast({ title: 'Validation Error', description: `SL doit être plus sécuritaire que le Prix de Liq. Estimé (${formatPrice(liqPrice)})`, variant: "destructive" });
+        return toast({ title: 'Validation Error', description: `SL must be safer than the Estimated Liquidation Price (${formatPrice(liqPrice)})`, variant: "destructive" });
       }
       if ((longSide && numSlPrice >= entryPrice) || (!longSide && numSlPrice <= entryPrice)) {
-        return toast({ title: 'Validation Error', description: `SL doit être sous le prix d'entrée pour Long ou au-dessus pour Short.`, variant: "destructive" });
+        return toast({ title: 'Validation Error', description: `SL must be below entry for Long or above for Short.`, variant: "destructive" });
       }
     }
 
     if (tpEnabled) {
       if ((longSide && numTpPrice <= entryPrice) || (!longSide && numTpPrice >= entryPrice)) {
-        return toast({ title: 'Validation Error', description: `TP doit être au-dessus du prix d'entrée pour Long ou en-dessous pour Short.`, variant: "destructive" });
+        return toast({ title: 'Validation Error', description: `TP must be above entry for Long or below for Short.`, variant: "destructive" });
       }
     }
-    // FIN VALIDATION
+    // END VALIDATION
 
 
     setLoading(true);
-    let txHash: Hash | undefined; // Déclaration de txHash avec le type Hash de viem
+    let txHash: Hash | undefined; 
 
     try {
       // Préparation des arguments en X6
@@ -315,7 +338,7 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
             abi: TRADING_ABI,
             functionName: 'openMarket',
             args: [
-                proof, // Le type Hash (0x...) est utilisé directement
+                proof, 
                 finalAssetIdForTx, 
                 longSide,
                 leverage,
@@ -333,16 +356,18 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
           await publicClient.waitForTransactionReceipt({ hash: txHash });
       }
 
-      const explorerUrl = `https://atlantic.pharosscan.xyz/tx/${txHash}`;
+      const explorerUrl = txHash ? `https://atlantic.pharosscan.xyz/tx/${txHash}` : undefined;
 
       toast({
         title: 'Order placed',
         description: (
           <span className="flex items-center space-x-1">
             <span>{longSide ? 'Buy' : 'Sell'} order placed successfully.</span>
-            <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="text-trading-blue underline flex items-center">
-              View Transaction <Send className="w-3 h-3 ml-1" />
-            </a>
+            {explorerUrl && (
+              <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="text-trading-blue underline flex items-center">
+                View Transaction <Send className="w-3 h-3 ml-1" />
+              </a>
+            )}
           </span>
         ),
       });
@@ -360,11 +385,10 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
         console.error("Trade Error:", error);
         let errorMsg = error?.message || 'Transaction failed.';
 
-        // Tentative d'extraire un message plus clair pour un Revert
         if (errorMsg.includes('User rejected the request')) {
-             errorMsg = 'Transaction rejetée par l\'utilisateur.';
+             errorMsg = 'Transaction rejected by user.';
         } else if (errorMsg.includes('revert')) {
-             errorMsg = 'La transaction a échoué (revert). La preuve a peut-être expiré ou est invalide.';
+             errorMsg = 'Transaction failed (revert). Proof may have expired or be invalid.';
         }
 
       toast({
@@ -381,8 +405,13 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
   return (
     <div className="w-[320px] h-full flex flex-col border-l border-border shadow-md bg-card">
       
+      {/* 🛑 BANNER D'AVERTISSEMENT (nouvel emplacement pour l'espacement) */}
+      <MarketClosedBanner status={marketStatus} />
+
       {/* Order Panel Content (Scrollable) */}
+      {/* On utilise 'mt-4' dans le composant Banner, on retire le 'pt-0' conditionnel ici */}
       <div className="flex-grow p-4 space-y-5 overflow-y-auto custom-scrollbar">
+        
         {/* 1. Tabs (Limit, Market) and Leverage */}
         <div className="flex justify-between items-center border-b border-border text-muted-foreground font-medium text-sm pt-1 pb-2">
           <div className="flex">
@@ -396,13 +425,16 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
             >
               Limit
             </div>
+            {/* Market Tab désactivé si marché fermé */}
             <div
-              className={`py-1 mr-4 cursor-pointer transition duration-150 ${
-                orderType === "market"
-                  ? "text-foreground border-b-2 border-foreground"
-                  : "hover:text-foreground"
+              className={`py-1 mr-4 transition duration-150 ${
+                !isMarketOpen 
+                  ? "text-muted-foreground/50 cursor-not-allowed" 
+                  : orderType === "market"
+                  ? "text-foreground border-b-2 border-foreground cursor-pointer"
+                  : "hover:text-foreground cursor-pointer"
               }`}
-              onClick={() => setOrderType("market")}
+              onClick={() => isMarketOpen && setOrderType("market")}
             >
               Market
             </div>
@@ -420,7 +452,7 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
           </div>
         </div>
 
-        {/* 2. Limit Price Input */}
+        {/* 2. Order Input based on type */}
         {orderType === "limit" && (
           <div>
             <span className="text-light-text text-xs block mb-1">Limit Price (USD)</span>
@@ -434,6 +466,13 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
             />
           </div>
         )}
+        {/* 2.1 Message si Market est sélectionné mais fermé */}
+        {orderType === "market" && !isMarketOpen && (
+          <div className="p-3 bg-red-100 text-red-800 rounded-md text-sm font-medium">
+            Market Orders not allowed while market is closed.
+          </div>
+        )}
+
 
         {/* 3. Amount Input (Lots) */}
         <div>
@@ -451,7 +490,7 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
           />
         </div>
 
-        {/* 4. Take Profit / Stop Loss (Utiliser StepController) */}
+        {/* 4. Take Profit / Stop Loss (Unchanged) */}
         <div className="space-y-3">
           {/* Take Profit Toggle */}
           <div>
@@ -502,21 +541,23 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
         <div className="flex space-x-3 pt-2 pb-3">
           <Button
             onClick={() => handleTrade(true)}
-            disabled={loading}
-            className="flex-1 bg-trading-blue hover:bg-trading-blue/90 text-white font-bold shadow-md"
+            // Désactiver si loading OU (Market Order ET marché fermé)
+            disabled={loading || (orderType === 'market' && !isMarketOpen)}
+            className={`flex-1 ${loading || (orderType === 'market' && !isMarketOpen) ? 'bg-gray-400' : 'bg-trading-blue hover:bg-trading-blue/90'} text-white font-bold shadow-md`}
           >
             {loading ? 'Processing...' : 'Buy'}
           </Button>
           <Button
             onClick={() => handleTrade(false)}
-            disabled={loading}
-            className="flex-1 bg-trading-red hover:bg-trading-red/90 text-white font-bold shadow-md"
+            // Désactiver si loading OU (Market Order ET marché fermé)
+            disabled={loading || (orderType === 'market' && !isMarketOpen)}
+            className={`flex-1 ${loading || (orderType === 'market' && !isMarketOpen) ? 'bg-gray-400' : 'bg-trading-red hover:bg-trading-red/90'} text-white font-bold shadow-md`}
           >
             {loading ? 'Processing...' : 'Sell'}
           </Button>
         </div>
 
-        {/* 6. Account Details (Calculations) */}
+        {/* 6. Account Details (Calculations) - Unchanged */}
         <div className="text-xs space-y-1.5 pt-3 border-t border-border">
           <div className="flex justify-between text-light-text">
             <span>Value</span>
@@ -535,7 +576,7 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
         </div>
       </div>
       
-      {/* 7. Deposit Info (Landmark Panel) - Hauteur 200px */}
+      {/* 7. Deposit Info (Landmark Panel) - Unchanged */}
       <div className="flex-shrink-0 mx-4 mt-2 mb-4 p-4 h-[200px] bg-blue-50 rounded-lg relative overflow-hidden">
         
         {/* Logo de banque en fond (Landmark) */}

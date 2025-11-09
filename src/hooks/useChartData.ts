@@ -16,7 +16,7 @@ export const useChartData = (pair: number = 0, interval: string = "300") => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`https://chart.brokex.trade/history?pair=${pair}&interval=${interval}`);
+        const response = await fetch(`https://backend.brokex.trade/history?pair=${pair}&interval=${interval}`);
         const result = await response.json();
         setData(result);
       } catch (error) {

@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+// Temps de pause entre chaque compteur
+const INTER_STEP_DELAY = 2000; 
+// Temps de défilement du compteur lui-même
+const SEQUENCE_TIMING = 2000; 
+
 // ====================================================================
 // 1. COMPOSANT POUR LE DÉFILEMENT DES NOMBRES (maintenu)
 // ====================================================================
@@ -17,7 +22,7 @@ interface CountingNumberProps {
 
 const CountingNumber: React.FC<CountingNumberProps> = ({ 
   end, 
-  duration = 2000, // 2 secondes pour défiler
+  duration = SEQUENCE_TIMING, // Utilise la constante globale
   decimals = 0,
   prefix = "",
   suffix = "" 
@@ -29,10 +34,12 @@ const CountingNumber: React.FC<CountingNumberProps> = ({
     const animate = (timestamp: number) => {
       if (!startTime) startTime = timestamp;
       const progress = Math.min((timestamp - startTime) / duration, 1);
-      // Utilisation d'une fonction de lissage (ease-out) pour un effet plus doux
+      
+      // Utilisation d'une fonction de lissage (ease-out)
       const easedProgress = 1 - Math.pow(1 - progress, 3); 
       const current = easedProgress * end;
       setCount(current);
+      
       if (progress < 1) {
         requestAnimationFrame(animate);
       }
@@ -62,52 +69,55 @@ interface WelcomeOverlayProps {
   onDismiss: () => void;
 }
 
-// Les étapes et leur contenu
+// Les étapes et leur contenu (duration ici est la durée du compteur)
 const STEPS = [
-    { id: 1, text: "Brokex Protocol v2 is deployed on Pharos Atlantic Network.", duration: 3000, delay: 500, type: 'TEXT' },
-    { id: 2, text: "Previous Testnet Success:", duration: 2500, endValue: 1400000, suffix: " Users", type: 'STAT' },
-    { id: 3, text: "Total Unique Trades:", duration: 2500, endValue: 70000000, suffix: " Trades", type: 'STAT' },
-    { id: 4, text: "Total Trading Volume:", duration: 2500, endValue: 35000000000, prefix: "$", suffix: " Volume", type: 'STAT' },
+    // L'étape 1 sert de point de départ du texte simple
+    { id: 1, text: "Brokex Protocol v2 is deployed on Pharos Atlantic Network.", duration: 3000, type: 'TEXT' },
+    // Les étapes STAT utilisent SEQUENCE_TIMING (2000ms) + INTER_STEP_DELAY (550ms)
+    { id: 2, text: "Previous Testnet Success:", duration: SEQUENCE_TIMING, endValue: 1400000, suffix: " Users", type: 'STAT' },
+    { id: 3, text: "Total Unique Trades:", duration: SEQUENCE_TIMING, endValue: 70000000, suffix: " Trades", type: 'STAT' },
+    { id: 4, text: "Total Trading Volume:", duration: SEQUENCE_TIMING, endValue: 35000000000, prefix: "$", suffix: " Volume", type: 'STAT' },
 ];
 
-const SEQUENCE_TIMING = 3000; // Temps visible par slide (hors durée de comptage)
-
 export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onDismiss }) => {
-  const [currentStep, setCurrentStep] = useState(0); // 0: Début, 1, 2, 3: Index des stats
+  const [currentStep, setCurrentStep] = useState(0); 
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     let timers: NodeJS.Timeout[] = [];
-    let delay = 0;
-
-    // 0. Initialisation et apparition (Fondu entrant)
-    setIsVisible(true); 
+    let cumulativeDelay = 500; // Délai initial avant la première étape (fondu entrant)
     
-    // 1. Démarrer la séquence après un léger délai
-    timers.push(setTimeout(() => setCurrentStep(1), 500));
-    delay += 500;
+    setIsVisible(true); 
 
-    // 2. Séquence des étapes (TEXTE + COMPTEURS)
+    // Début de la séquence après le délai initial
+    timers.push(setTimeout(() => setCurrentStep(1), cumulativeDelay));
+
+    // Calcul du délai total pour les étapes STAT
     STEPS.forEach((step, index) => {
-        // Temps d'affichage + temps de transition avant la prochaine slide
-        const stepDisplayTime = step.duration + 500; 
+        let stepDuration = step.duration; // Temps de défilement (TEXTE) ou de comptage (STAT)
         
+        // Si c'est une étape STAT, on ajoute le délai de pause après le compteur
+        const pauseTime = step.type === 'STAT' ? INTER_STEP_DELAY : 500; // 500ms pour l'étape TEXTE
+
+        cumulativeDelay += stepDuration;
+        
+        // La prochaine étape commence APRES la durée de l'étape courante PLUS la pause
         timers.push(setTimeout(() => {
-            setCurrentStep(step.id);
-        }, delay));
-        
-        // Accumuler le délai total
-        delay += stepDisplayTime; 
+            if (index < STEPS.length - 1) {
+                 setCurrentStep(STEPS[index + 1].id);
+            }
+        }, cumulativeDelay));
+
+        cumulativeDelay += pauseTime;
     });
 
-    // 3. Fermeture de l'overlay (après toutes les slides)
-    timers.push(setTimeout(handleSkip, delay + 1000)); // + 1s de marge
-
+    // Fermeture de l'overlay (après la dernière étape + sa pause)
+    timers.push(setTimeout(handleSkip, cumulativeDelay)); 
 
     return () => {
       timers.forEach(clearTimeout);
     };
-  }, []);
+  }, []); // [] = Se lance une seule fois au montage
 
   const handleSkip = () => {
     setIsVisible(false);
@@ -122,7 +132,8 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onDismiss }) => 
 
     if (stepData.type === 'TEXT') {
         return (
-            <h2 className="text-3xl lg:text-5xl font-bold transition-opacity duration-700 animate-pulse text-center">
+            // J'ai retiré 'animate-pulse' pour éliminer le clignotement
+            <h2 className="text-3xl lg:text-5xl font-bold transition-opacity duration-700 text-center">
                 {stepData.text}
             </h2>
         );
@@ -130,13 +141,13 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onDismiss }) => 
 
     if (stepData.type === 'STAT') {
         return (
-            <div className="space-y-4">
-                <h3 className="text-xl font-semibold text-gray-300 transition-opacity duration-700">
+            <div className="space-y-4 transition-opacity duration-500">
+                <h3 className="text-xl font-semibold text-gray-300">
                     {stepData.text}
                 </h3>
                 <CountingNumber 
                     end={stepData.endValue}
-                    duration={SEQUENCE_TIMING} 
+                    duration={stepData.duration} // Utilise 2000ms
                     prefix={stepData.prefix}
                     suffix={stepData.suffix}
                 />

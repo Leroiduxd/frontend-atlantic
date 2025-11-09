@@ -6,24 +6,26 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useFaucet } from '@/hooks/useFaucet'; 
 import { useToast } from "@/hooks/use-toast";
+import { useAccount } from 'wagmi'; // Import de Wagmi pour l'état de connexion
 
-// Définitions des props pour le contrôle
+// Définitions des props (retour à la version simple)
 interface FaucetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  // Optionnel: peut être utilisé pour forcer l'ouverture en cas d'erreur de trading
   errorContext?: 'lowBalance' | 'transactionError' | null;
 }
 
 export const FaucetDialog: React.FC<FaucetDialogProps> = ({ open, onOpenChange, errorContext }) => {
   const { toast } = useToast();
+  const { isConnected } = useAccount(); // État de connexion
+
   const { 
     hasClaimed, 
     isLoadingClaimStatus, 
     isClaiming, 
     claimTestTokens,
     tokenBalance,
-    isApproved, // État d'approbation infinie
+    isApproved, 
     isApproving,
     approveVault,
     refetch,
@@ -33,35 +35,47 @@ export const FaucetDialog: React.FC<FaucetDialogProps> = ({ open, onOpenChange, 
   const primaryColor = 'text-trading-blue';
   const successColor = 'text-green-500'; 
   const bgColor = 'bg-blue-50';
-  const isConnected = true; // On suppose la connexion est gérée par le contexte Wagmi/RainbowKit
 
-  // Composant pour l'arrière-plan de l'icône
+  // Composant pour l'arrière-plan de l'icône (non modifié)
   const BackgroundIcon = ({ Icon, isDone }: { Icon: React.ElementType, isDone: boolean }) => (
     <div className={`absolute top-1/2 -translate-y-1/2 -left-1/3 flex items-center justify-center transition-opacity duration-300 ${isDone ? 'opacity-20' : 'opacity-10'}`}>
         <Icon className={`w-[300px] h-[300px] ${isDone ? successColor : primaryColor} z-0`} /> 
     </div>
   );
   
+  // Fonction qui affiche le toast et bloque l'action si déconnecté
+  const showConnectWalletToast = () => {
+    toast({ 
+        title: "Connection Required", 
+        description: "Please connect your wallet to proceed.", 
+        variant: "destructive" 
+    });
+  };
+
   // Fonction de gestion du Claim
   const handleClaim = async () => {
+    if (!isConnected) {
+        return showConnectWalletToast();
+    }
+
     try {
         await claimTestTokens();
-        // 🛑 Message de succès affiché UNIQUEMENT si claimTestTokens réussit
         toast({ title: "Claim Successful", description: "Test funds claimed!" });
     } catch (error: any) {
-        // 🛑 Gestion des erreurs plus précise (souvent le message vient de Wagmi)
         toast({ title: "Claim Failed", description: error?.shortMessage || error?.message || "Transaction failed or was rejected.", variant: "destructive" });
     }
   };
 
   // Fonction de gestion de l'Approbation
   const handleApprove = async () => {
+    if (!isConnected) {
+        return showConnectWalletToast();
+    }
+    
     try {
         await approveVault(); 
-        // 🛑 Message de succès affiché UNIQUEMENT si approveVault réussit
         toast({ title: "Approval Successful", description: "Vault approved for infinite TUSD." });
     } catch (error: any) {
-        // 🛑 Gestion des erreurs plus précise
         toast({ title: "Approval Failed", description: error?.shortMessage || error?.message || "Transaction failed or was rejected.", variant: "destructive" });
     }
   };
@@ -71,7 +85,7 @@ export const FaucetDialog: React.FC<FaucetDialogProps> = ({ open, onOpenChange, 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[650px] max-w-none p-0 bg-white shadow-xl rounded-lg">
         
-        {/* Vérifier l'état de la connexion (simplifié ici, car useAccount est utilisé dans le hook) */}
+        {/* Affichage conditionnel basé sur l'état de connexion */}
         {isConnected ? (
           <div className="flex p-0">
             
@@ -156,10 +170,15 @@ export const FaucetDialog: React.FC<FaucetDialogProps> = ({ open, onOpenChange, 
             
           </div>
         ) : (
-             <div className="text-center py-12">
-                <p className="text-gray-500 mb-4">Connect your wallet to access the Faucet.</p>
+             <div className="text-center py-12 px-8 flex flex-col items-center justify-center min-h-[450px]">
+                <Wallet className="w-12 h-12 text-gray-400 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">Wallet Connection Required</h3>
+                <p className="text-gray-600 mb-6">
+                    Please connect your wallet to access the Faucet, claim test tokens, and approve the Vault for trading.
+                </p>
                 <div className="mx-auto w-fit">
-                   <Button className="bg-trading-blue hover:bg-trading-blue/90" disabled={true}>Connect Wallet</Button> 
+                   {/* Afficher un bouton décoratif mais non fonctionnel */}
+              
                 </div>
               </div>
         )}

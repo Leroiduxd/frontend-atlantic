@@ -11,9 +11,14 @@ import { EditStopsDialog } from "./EditStopsDialog";
 import { useWebSocket, getAssetsByCategory, WebSocketMessage } from "@/hooks/useWebSocket";
 import { useAssetConfig } from "@/hooks/useAssetConfig"; 
 import { Hash } from 'viem'; 
+// NOUVEAUX IMPORTS
+import { useMarketStatus } from "@/hooks/useMarketStatus"; // Import du hook de statut de marché
+import { enUS } from 'date-fns/locale';
+import { Sunset } from 'lucide-react'; // Icône pour la notification
 
 type TabType = "openPositions" | "pendingOrders" | "closedPositions" | "cancelledOrders";
 
+// ... (getMarketProof et autres fonctions utilitaires non modifiées) ...
 // FONCTION UTILITAIRE : Récupérer la Preuve
 const getMarketProof = async (assetId: number): Promise<Hash> => {
     const url = `https://proof.brokex.trade/proof?pairs=${assetId}`;
@@ -32,6 +37,24 @@ const getMarketProof = async (assetId: number): Promise<Hash> => {
 
     return proof as Hash; 
 };
+// ... (Fin des fonctions utilitaires) ...
+
+// Fonction utilitaire pour formater le temps en h m s
+const formatTimeUntil = (ms: number | undefined) => {
+    if (ms === undefined || ms <= 0) return '';
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    let parts = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    // Inclure les secondes seulement si c'est moins d'une minute
+    if (hours === 0 && minutes === 0 && seconds > 0) parts.push(`${seconds}s`);
+    
+    return parts.join(' ');
+};
 
 const PositionsSection = () => {
   const [activeTab, setActiveTab] = useState<TabType>("openPositions");
@@ -39,7 +62,6 @@ const PositionsSection = () => {
   const [selectedPosition, setSelectedPosition] = useState<any>(null);
   const { positions, orders, closedPositions, cancelledOrders, refetch } = usePositions();
   
-  // Utilisation de closePosition, la fonction qui est probablement exportée de votre hook useTrading
   const { cancelOrder, updateStops, closePosition } = useTrading(); 
   const { toast } = useToast();
   
@@ -47,7 +69,9 @@ const PositionsSection = () => {
   const { data: wsData } = useWebSocket();
   const { configs: assetConfigs, convertLotsToDisplay } = useAssetConfig(); 
 
-  // Carte pour lier Asset ID aux symboles et décimales du trading
+  // ... (assetSymbolMap, assetMap, formatPrice, formatLotSize, formatDate, calculatePNL, enrichPosition, enrichedData useMemos non modifiés pour la concision) ...
+
+  // Carte pour lier Asset ID aux symboles et décimales du trading (récupéré de votre code original)
   const assetSymbolMap = useMemo(() => {
     return assetConfigs.reduce((map, config) => {
         const powerOfTen = Math.round(Math.log10(1000000 / config.tick_size_usd6)); 
@@ -64,7 +88,7 @@ const PositionsSection = () => {
   }, [assetConfigs]);
 
 
-  // Carte pour lier Asset ID à la paire et au prix actuel du WS
+  // Carte pour lier Asset ID à la paire et au prix actuel du WS (récupéré de votre code original)
   const assetMap = useMemo(() => {
     const allAssets = getAssetsByCategory(wsData).crypto.concat(
         getAssetsByCategory(wsData).forex,
@@ -83,7 +107,7 @@ const PositionsSection = () => {
   }, [wsData]);
 
 
-  // Fonctions d'aide
+  // Fonctions d'aide (récupéré de votre code original)
   const formatPrice = (valueX6: number, assetId: number) => {
     const assetInfo = assetSymbolMap[assetId];
     if (!assetInfo || valueX6 === 0) return "0.00";
@@ -163,24 +187,72 @@ const PositionsSection = () => {
 
   const enrichedPositions = useMemo(() => positions.map(enrichPosition), [positions, assetMap, assetSymbolMap]);
   const enrichedOrders = useMemo(() => orders.map(enrichPosition), [orders, assetMap, assetSymbolMap]);
-  const enrichedClosedPositions = useMemo(() => closedPositions.map(enrichPosition), [closedPositions, assetMap]);
-  const enrichedCancelledOrders = useMemo(() => cancelledOrders.map(enrichPosition), [cancelledOrders, assetMap]);
+  const enrichedClosedPositions = useMemo(() => closedPositions.map(enrichPosition), [closedPositions, assetMap, assetSymbolMap]);
+  const enrichedCancelledOrders = useMemo(() => cancelledOrders.map(enrichPosition), [cancelledOrders, assetMap, assetSymbolMap]);
 
 
   // --- Logique des handlers ---
 
-  // 🛑 CORRECTION: S'assurer que SEULEMENT l'ID et la preuve sont passés
+  // 🛑 UTILISATION D'UN HOOK D'ÉTAT POUR LE STATUT DU MARCHÉ AVANT DE FERMER
+  const [marketStatusCache, setMarketStatusCache] = useState<{ [assetId: number]: ReturnType<typeof useMarketStatus> }>({});
+  
+  // Hook d'effet pour mettre à jour le statut des actifs ouverts
+  useEffect(() => {
+    // Mettre à jour le statut uniquement pour les actifs que nous avons en position
+    positions.forEach(position => {
+      if (!marketStatusCache[position.asset_id]) {
+        // NOTE: Ceci est un hook personnalisé et ne doit pas être appelé dans une boucle.
+        // Puisque nous ne pouvons pas appeler de hook dans une boucle, nous allons
+        // simuler l'appel en utilisant une fonction utilitaire si possible, ou
+        // simplifier la vérification du statut pour la démo.
+        // Pour être valide, useMarketStatus doit être transformé en fonction utilitaire qui
+        // utilise getMarketStatusUTC, ou nous devons le lier à l'ID d'une position active.
+        // Simplification : Nous allons chercher le statut directement dans le handler.
+      }
+    });
+  }, [positions]);
+  
+  // MODIFICATION DE handleClosePosition
   const handleClosePosition = async (position: any) => { 
     try {
       if (!position.asset_id) {
           throw new Error("Asset ID is missing for the position.");
       }
       
-      // 1. Récupérer la preuve (Doit être exécuté immédiatement avant la transaction)
-      const proof = await getMarketProof(position.asset_id);
+      const assetId = position.asset_id;
       
-      // 2. Appel de la fonction de fermeture avec ID et PREUVE (minimum requis)
-      // NOTE: L'implémentation de closePosition dans useTrading DOIT appeler closeMarket(id, proof)
+      // 1. VÉRIFICATION DU STATUT DU MARCHÉ (Simulation d'appel au hook)
+      // On importe et utilise getMarketStatusUTC directement avec l'ID pour la vérification instantanée.
+      const { getMarketKindFromId, getMarketStatusUTC } = await import('@/hooks/useopen'); // Import dynamique pour l'exemple
+      const kind = getMarketKindFromId(assetId);
+      
+      if (kind) {
+          const status = getMarketStatusUTC(kind, new Date());
+          
+          if (!status.isOpen) {
+              const timeRemaining = formatTimeUntil(status.timeUntilOpenMs);
+              const openTime = status.nextOpen ? format(status.nextOpen, 'EEEE, MMM d HH:mm', { locale: enUS }) : 'Unknown';
+
+              // Notification mauve si le marché est fermé
+              toast({
+                  title: 'Market Closed (Cannot Close Position)',
+                  description: (
+                      <div className="flex flex-col space-y-1">
+                        <p>Market orders are disabled when the market is closed.</p>
+                        <p className="font-semibold">Next Open: {openTime} UTC</p>
+                        {timeRemaining && <p className="text-sm">Opens in: {timeRemaining}</p>}
+                      </div>
+                  ),
+                  variant: "destructive",
+                  className: "bg-purple-600 text-white border-purple-800", // Style mauve
+                  duration: 8000,
+              });
+              return; // Bloquer la transaction
+          }
+      }
+      
+      // 2. Récupérer la preuve et fermer la position (SI OUVERT)
+      const proof = await getMarketProof(assetId);
       await closePosition(position.id, proof); 
       
       toast({
@@ -188,6 +260,7 @@ const PositionsSection = () => {
         description: "Your position has been closed successfully.",
       });
       setTimeout(() => refetch(), 2000);
+      
     } catch (error: any) {
       console.error("Close Position Error:", error);
       toast({

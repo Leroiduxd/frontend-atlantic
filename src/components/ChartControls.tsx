@@ -55,11 +55,11 @@ export const ChartControls = (props: ChartControlsProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleAssetChange = (asset: any) => {
-    // CORRECTION: Normalisation pour s'assurer que l'ID est un nombre valide
+    // FIX 4: Normalization: 0 is valid, use -1 for invalid IDs.
     const normalizedId = Number(asset.id);
 
     const normalizedAsset: Asset = {
-        id: Number.isFinite(normalizedId) ? normalizedId : 0,
+        id: Number.isFinite(normalizedId) ? normalizedId : -1,
         name: asset.name,
         symbol: asset.symbol,
         pair: asset.pair,
@@ -135,7 +135,7 @@ export const ChartControls = (props: ChartControlsProps) => {
                 </div>
               </TabsContent>
               
-              {/* 🛑 AJOUT : Forex Tab */}
+              {/* Forex Tab */}
               <TabsContent value="forex" className="m-0 p-2">
                 <div className="space-y-1">
                   {categories.forex.length > 0 ? (
@@ -164,7 +164,7 @@ export const ChartControls = (props: ChartControlsProps) => {
                 </div>
               </TabsContent>
 
-              {/* 🛑 AJOUT : Commodities Tab */}
+              {/* Commodities Tab */}
               <TabsContent value="commodities" className="m-0 p-2">
                 <div className="space-y-1">
                   {categories.commodities.length > 0 ? (
@@ -193,7 +193,7 @@ export const ChartControls = (props: ChartControlsProps) => {
                 </div>
               </TabsContent>
 
-              {/* 🛑 AJOUT : Stocks Tab */}
+              {/* Stocks Tab */}
               <TabsContent value="stocks" className="m-0 p-2">
                 <div className="space-y-1">
                   {categories.stocks.length > 0 ? (
@@ -222,7 +222,7 @@ export const ChartControls = (props: ChartControlsProps) => {
                 </div>
               </TabsContent>
               
-              {/* 🛑 AJOUT : Indices Tab */}
+              {/* Indices Tab */}
               <TabsContent value="indices" className="m-0 p-2">
                 <div className="space-y-1">
                   {categories.indices.length > 0 ? (

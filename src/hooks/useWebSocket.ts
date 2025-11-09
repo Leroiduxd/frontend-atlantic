@@ -33,7 +33,7 @@ export const useWebSocket = () => {
   useEffect(() => {
     const connect = () => {
       try {
-        const ws = new WebSocket('wss://wss.brokex.trade:8443');
+        const ws = new WebSocket('wss://backend.brokex.trade/ws/prices');
         
         ws.onopen = () => {
           console.log('WebSocket connected');
