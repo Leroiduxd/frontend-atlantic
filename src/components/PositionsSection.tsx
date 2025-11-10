@@ -21,7 +21,7 @@ type TabType = "openPositions" | "pendingOrders" | "closedPositions" | "cancelle
 // ... (getMarketProof et autres fonctions utilitaires non modifiées) ...
 // FONCTION UTILITAIRE : Récupérer la Preuve
 const getMarketProof = async (assetId: number): Promise<Hash> => {
-    const url = `https://proof.brokex.trade/proof?pairs=${assetId}`;
+    const url = `https://backend.brokex.trade/proof?pairs=${assetId}`;
     const response = await fetch(url);
 
     if (!response.ok) {
