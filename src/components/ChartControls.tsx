@@ -1,3 +1,4 @@
+// ChartControls.tsx
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -50,6 +51,8 @@ export const ChartControls = (props: ChartControlsProps) => {
     onAssetChange, 
     selectedTimeframe, 
     onTimeframeChange, 
+    // 🛑 CORRECTION: priceChange et priceChangePercent ne sont pas utilisés directement ici, 
+    // seule l'info 24h stockée dans selectedAsset est affichée.
     priceChange, 
     priceChangePercent, 
     currentPrice 
@@ -59,7 +62,7 @@ export const ChartControls = (props: ChartControlsProps) => {
   const categories = getAssetsByCategory(wsData);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isNetworkDialogOpen, setIsNetworkDialogOpen] = useState(false); // État pour la modale réseau
+  const [isNetworkDialogOpen, setIsNetworkDialogOpen] = useState(false); 
   const [selectedNetwork, setSelectedNetwork] = useState(NETWORKS[0]); 
 
   const handleAssetChange = (asset: any) => {
@@ -87,10 +90,13 @@ export const ChartControls = (props: ChartControlsProps) => {
     return value.toFixed(2);
   };
 
-  const isPositive = priceChange >= 0;
+  // 🛑 CORRECTION: Utiliser l'info 24h de l'actif sélectionné
+  const priceChange24h = parseFloat(selectedAsset.change24h || '0');
+  const isPositive = priceChange24h >= 0;
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 h-12 bg-chart-bg border-t border-border flex items-center justify-between px-4 gap-4">
+    // 🛑 AJOUT: z-50 pour s'assurer que cette barre est au-dessus de ChartToolbar (z-40)
+    <div className="absolute bottom-0 left-0 right-0 h-12 bg-chart-bg border-t border-border flex items-center justify-between px-4 gap-4 z-50">
       
       {/* Group 1: Asset Selector & Price Info */}
       <div className="flex items-center gap-4">
@@ -157,14 +163,15 @@ export const ChartControls = (props: ChartControlsProps) => {
 
           {/* Price Info */}
           <div className="flex items-center gap-3">
-            <span className="font-semibold text-base">{formatPrice(currentPrice)}</span>
+            {/* 🛑 CORRECTION: Utilisation de currentPrice passé par TradingSection (qui est le prix du tick ou agrégé) */}
+            <span className="font-semibold text-base">{formatPrice(currentPrice)}</span> 
             <span
               className={`text-sm font-semibold ${
                 isPositive ? "text-trading-blue" : "text-trading-red"
               }`}
             >
               {isPositive ? "+" : ""}
-              {parseFloat(selectedAsset.change24h || '0').toFixed(2)}%
+              {priceChange24h.toFixed(2)}%
             </span>
           </div>
       </div>
@@ -192,20 +199,32 @@ export const ChartControls = (props: ChartControlsProps) => {
           {/* NOUVEAU: Network Selector */}
           <Dialog open={isNetworkDialogOpen} onOpenChange={setIsNetworkDialogOpen}>
               <DialogTrigger asChild>
-                  <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 h-7 px-3 text-xs font-semibold"
-                  >
-                      {/* 🛑 UTILISATION DE L'IMAGE POUR L'ICÔNE */}
-                      <img 
-                          src="public/icon.png" 
-                          alt="Network Icon" 
-                          className="w-4 h-4 rounded-full" 
-                      />
-                      {selectedNetwork.name}
-                      <ChevronDown className="h-3 w-3" />
-                  </Button>
+                  {/* 🛑 MODIFICATION: Utilisation d'un conteneur Flexbox pour centrer le séparateur */}
+                  <div className="flex items-center h-12 -my-4 -mr-4">
+                       
+                      {/* 🛑 NOUVEAU: Le trait séparateur vertical qui ne touche pas les bords */}
+                      <div className="h-6 w-px bg-border mr-4"></div>
+
+                      {/* 🛑 Zone cliquable du Network Selector */}
+                      <div
+                          role="button" // Rendre le div cliquable et accessible
+                          aria-label="Select Network"
+                          onClick={() => setIsNetworkDialogOpen(true)}
+                          // 🛑 NOUVELLES CLASSES: Fond transparent (bg-chart-bg) et padding pour compenser le -mr-4
+                          className="flex items-center gap-2 pr-4 cursor-pointer transition-colors"
+                      >
+                          {/* Icône du réseau */}
+                          <img 
+                              src="public/icon.png" 
+                              alt="Network Icon" 
+                              className="w-4 h-4 rounded-full" 
+                          />
+                          {/* Nom du réseau */}
+                          <span className="text-xs font-semibold text-primary"> 
+                              {selectedNetwork.name}
+                          </span>
+                      </div>
+                  </div>
               </DialogTrigger>
               <DialogContent className="w-[300px] p-0 bg-background">
                   <div className="p-4 space-y-2">
