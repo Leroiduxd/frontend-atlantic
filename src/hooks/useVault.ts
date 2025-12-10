@@ -1,12 +1,14 @@
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useConfig } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useConfig } from 'wagmi';
 import { VAULT_ADDRESS, VAULT_ABI, TOKEN_ADDRESS, TOKEN_ABI } from '@/config/contracts';
 import { formatUnits, parseUnits } from 'viem';
 import { customChain } from '@/config/wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
+import { logTransaction } from '@/services/transactionLogger';
 
 export const useVault = () => {
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
   const config = useConfig();
 
   // Read vault balances
@@ -89,6 +91,18 @@ export const useVault = () => {
         chain: customChain,
       });
 
+      // Wait for transaction confirmation, then log
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash });
+        logTransaction({
+          userAddress: address,
+          txHash: hash,
+          actionType: 'APPROVE',
+          venue: 'brokex',
+          chainId: customChain.id,
+        });
+      }
+
       return hash;
     } catch (error: unknown) {
       console.error('Approval error details:', {
@@ -157,6 +171,18 @@ export const useVault = () => {
         chain: customChain,
       });
 
+      // Wait for transaction confirmation, then log
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash });
+        logTransaction({
+          userAddress: address,
+          txHash: hash,
+          actionType: 'DEPOSIT',
+          venue: 'brokex',
+          chainId: customChain.id,
+        });
+      }
+
       return hash;
     } catch (error: unknown) {
       console.error('Deposit error details:', {
@@ -206,6 +232,18 @@ export const useVault = () => {
         account: address,
         chain: customChain,
       });
+
+      // Wait for transaction confirmation, then log
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash });
+        logTransaction({
+          userAddress: address,
+          txHash: hash,
+          actionType: 'WITHDRAW',
+          venue: 'brokex',
+          chainId: customChain.id,
+        });
+      }
 
       return hash;
     } catch (error: unknown) {

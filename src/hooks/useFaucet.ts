@@ -10,6 +10,8 @@ import {
 } from 'wagmi';
 import { parseUnits, formatUnits, maxUint256 } from 'viem'; 
 import { useQueryClient } from '@tanstack/react-query'; // 🛑 IMPORT NÉCESSAIRE
+import { logTransaction } from '@/services/transactionLogger';
+import { customChain } from '@/config/wagmi';
 
 // --- ADRESSES ET ABIs ---
 const FAUCET_ADDRESS = '0x68c8eb31fbf00d4d37904ad76d68e78763429700';
@@ -116,9 +118,18 @@ export const useFaucet = () => {
     try {
         const hash = await writeContractAsync(claimSimulate.request);
         
-        // 🛑 CORRECTION : Utiliser l'instance de publicClient
+        // Wait for transaction confirmation, then log
         if (publicClient) {
           await publicClient.waitForTransactionReceipt({ hash });
+          if (address) {
+            logTransaction({
+              userAddress: address,
+              txHash: hash,
+              actionType: 'FAUCET_CLAIM',
+              venue: 'brokex',
+              chainId: customChain.id,
+            });
+          }
         }
         
         // Délai de 5 secondes après confirmation pour le re-fetch
@@ -128,7 +139,7 @@ export const useFaucet = () => {
     } finally {
         setIsClaiming(false);
     }
-  }, [claimSimulate?.request, writeContractAsync, refetch, publicClient]);
+  }, [claimSimulate?.request, writeContractAsync, refetch, publicClient, address]);
 
 
   // --- Logique d'Écriture : APPROVE (Infinie) ---
@@ -156,9 +167,18 @@ export const useFaucet = () => {
     try {
         const hash = await writeContractAsync(approveSimulate.request);
         
-        // 🛑 CORRECTION : Utiliser l'instance de publicClient
+        // Wait for transaction confirmation, then log
         if (publicClient) {
           await publicClient.waitForTransactionReceipt({ hash });
+          if (address) {
+            logTransaction({
+              userAddress: address,
+              txHash: hash,
+              actionType: 'FAUCET_APPROVE',
+              venue: 'brokex',
+              chainId: customChain.id,
+            });
+          }
         }
 
         // Délai de 5 secondes après confirmation pour le re-fetch
@@ -168,7 +188,7 @@ export const useFaucet = () => {
     } finally {
         setIsApproving(false);
     }
-  }, [approveSimulate?.request, writeContractAsync, refetch, publicClient, isApproved]);
+  }, [approveSimulate?.request, writeContractAsync, refetch, publicClient, isApproved, address]);
 
 
   return {

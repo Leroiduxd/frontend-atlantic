@@ -8,6 +8,7 @@ import { WagmiProvider } from 'wagmi';
 import { config } from './config/wagmi';
 import '@rainbow-me/rainbowkit/styles.css';
 import { SpiceFlowProvider } from "@spicenet-io/spiceflow-ui";
+import { PrivyProvider } from "@privy-io/react-auth";
 import "@spicenet-io/spiceflow-ui/styles.css";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -21,25 +22,28 @@ const App = () => (
     <WagmiProvider config={config}> 
       {/* 🛑 3. RainbowKitProvider (Doit être en dessous de Wagmi) */}
       <RainbowKitProvider> 
-        <SpiceFlowProvider 
-          provider="privy"
-          privyAppId="cmebl077a0160l40a7xpxcv84"
-          supportedChainIds={[84532, 688689,5115 ,421614, 11155111]}
-          nativeChainId={688689}
-          nonEip7702Mode={true}
-        >
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </SpiceFlowProvider>
+        <PrivyProvider appId="cmebl077a0160l40a7xpxcv84">
+          <SpiceFlowProvider 
+            provider="privy"
+            privyAppId="cmebl077a0160l40a7xpxcv84"
+            supportedChainIds={[84532, 688689,5115 ,421614, 11155111]}
+            nativeChainId={688689}
+            nonEip7702Mode={true}
+            appName="Brokex"
+          >
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </SpiceFlowProvider>
+        </PrivyProvider>
       </RainbowKitProvider>
     </WagmiProvider>
   </QueryClientProvider>

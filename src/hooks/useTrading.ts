@@ -1,8 +1,9 @@
-import { useAccount, useWriteContract } from 'wagmi';
+import { useAccount, useWriteContract, usePublicClient } from 'wagmi';
 // Assurez-vous que ces imports pointent vers le fichier avec les ABIs mis à jour
 import { TRADING_ADDRESS, TRADING_ABI } from '@/config/contracts'; 
 import { customChain } from '@/config/wagmi';
-import { Hash } from 'viem'; 
+import { Hash } from 'viem';
+import { logTransaction } from '@/services/transactionLogger'; 
 
 // ====================================================================
 // Interfaces Mises à Jour pour les fonctions du contrat
@@ -32,6 +33,7 @@ interface OpenPositionMarketParams {
 export const useTrading = () => {
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
 
   // ====================================================================
   // 1. OPEN POSITION (Market & Limit)
@@ -58,6 +60,18 @@ export const useTrading = () => {
       chain: customChain,
     });
 
+    // Wait for transaction confirmation, then log
+    if (publicClient) {
+      await publicClient.waitForTransactionReceipt({ hash });
+      logTransaction({
+        userAddress: address,
+        txHash: hash,
+        actionType: params.longSide ? 'LIMIT_BUY' : 'LIMIT_SELL',
+        venue: 'brokex',
+        chainId: customChain.id,
+      });
+    }
+
     return hash;
   };
   
@@ -81,6 +95,18 @@ export const useTrading = () => {
       chain: customChain,
     });
 
+    // Wait for transaction confirmation, then log
+    if (publicClient) {
+      await publicClient.waitForTransactionReceipt({ hash });
+      logTransaction({
+        userAddress: address,
+        txHash: hash,
+        actionType: params.longSide ? 'MARKET_BUY' : 'MARKET_SELL',
+        venue: 'brokex',
+        chainId: customChain.id,
+      });
+    }
+
     return hash;
   };
 
@@ -100,6 +126,18 @@ export const useTrading = () => {
       account: address,
       chain: customChain,
     });
+
+    // Wait for transaction confirmation, then log
+    if (publicClient) {
+      await publicClient.waitForTransactionReceipt({ hash });
+      logTransaction({
+        userAddress: address,
+        txHash: hash,
+        actionType: 'CANCEL_ORDER',
+        venue: 'brokex',
+        chainId: customChain.id,
+      });
+    }
 
     return hash;
   };
@@ -152,6 +190,23 @@ export const useTrading = () => {
         chain: customChain,
     });
 
+    // Wait for transaction confirmation, then log
+    if (publicClient) {
+      await publicClient.waitForTransactionReceipt({ hash });
+      const actionTypeMap: Record<string, string> = {
+        'updateStops': 'UPDATE_STOPS',
+        'setSL': 'UPDATE_SL',
+        'setTP': 'UPDATE_TP',
+      };
+      logTransaction({
+        userAddress: address,
+        txHash: hash,
+        actionType: actionTypeMap[functionName] || functionName,
+        venue: 'brokex',
+        chainId: customChain.id,
+      });
+    }
+
     return hash;
   };
 
@@ -175,6 +230,18 @@ export const useTrading = () => {
       account: address,
       chain: customChain,
     });
+
+    // Wait for transaction confirmation, then log
+    if (publicClient) {
+      await publicClient.waitForTransactionReceipt({ hash });
+      logTransaction({
+        userAddress: address,
+        txHash: hash,
+        actionType: 'CLOSE_POSITION',
+        venue: 'brokex',
+        chainId: customChain.id,
+      });
+    }
 
     return hash;
   };

@@ -215,11 +215,26 @@ const PositionsSection = () => {
   // MODIFICATION DE handleClosePosition
   const handleClosePosition = async (position: any) => { 
     try {
-      if (!position.asset_id) {
-          throw new Error("Asset ID is missing for the position.");
+      let assetId = position?.asset_id ?? position?.assetId;
+      
+      // If asset_id is missing (undefined or null), try to find it from the original positions array
+      if ((assetId === undefined || assetId === null) && position?.id) {
+        const originalPosition = positions.find(p => p.id === position.id);
+        if (originalPosition?.asset_id !== undefined && originalPosition?.asset_id !== null) {
+          assetId = originalPosition.asset_id;
+        }
       }
       
-      const assetId = position.asset_id;
+      if (assetId === undefined || assetId === null) {
+          console.error("Position data:", {
+            position,
+            positionId: position?.id,
+            assetId: assetId,
+            hasAssetId: !!position?.asset_id,
+            originalPosition: positions.find(p => p.id === position?.id)
+          });
+          throw new Error(`Asset ID is missing for position ${position?.id}. Please refresh the page and try again.`);
+      }
       
       // 1. VÉRIFICATION DU STATUT DU MARCHÉ (Simulation d'appel au hook)
       // On importe et utilise getMarketStatusUTC directement avec l'ID pour la vérification instantanée.

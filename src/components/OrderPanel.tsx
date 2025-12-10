@@ -10,12 +10,13 @@ import { Asset } from "./ChartControls";
 import { useAssetConfig } from "@/hooks/useAssetConfig";
 import { MarketClosedBanner } from "./MarketClosedBanner"; // 🛑 IMPORT DU NOUVEAU COMPOSANT
 // Wagmi/Viem Imports
-import { useWriteContract, useConfig, useAccount, useSwitchChain } from 'wagmi';
+import { useWriteContract, usePublicClient, useAccount, useSwitchChain } from 'wagmi';
 import { Landmark, Send } from "lucide-react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { Hash } from 'viem';
 import { customChain } from "@/config/wagmi";
 import { useVaultBalances } from "@/hooks/useVaultBalances";
+import { logTransaction } from "@/services/transactionLogger";
 
 // Import du hook de statut de marché
 import { useMarketStatus } from "@/hooks/useMarketStatus";
@@ -147,7 +148,7 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
   const { balance, available, locked, refetchAll, deposit, withdraw } = useVault();
   const { toast } = useToast();
   const { getConfigById, convertDisplayToLots } = useAssetConfig();
-  const { totalBalance, refetchAll: refetchBalances } = useVaultBalances();
+  const { totalBalance, walletBalance = '0.00', refetchAll: refetchBalances } = useVaultBalances();
   const { isConnected, chain: currentChain, address: account } = useAccount();
 
   // Check if user has Spice balance
@@ -157,10 +158,98 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 
+  const walletBalanceNum = useMemo(() => {
+    const balanceStr = walletBalance?.replace(/,/g, "") || "0";
+    return parseFloat(balanceStr) || 0;
+  }, [walletBalance]);
+
+  const brokexBalanceNum = useMemo(
+    () => (available ? parseFloat(available) || 0 : 0),
+    [available],
+  );
+
+  const customBalanceSections = useMemo(() => {
+    const sections: {
+      id: string;
+      title: string;
+      totalBalance: number;
+      items: Array<{
+        id: string;
+        name: string;
+        balance: number;
+        subtitle?: string;
+        networks?: number[];
+      }>;
+      defaultExpanded?: boolean;
+      emptyMessage?: string;
+    }[] = [];
+
+    const crossChainBalance = balanceData?.totalBalance || 0;
+    const crossChainItems = balanceData?.freeCollateralItems || [];
+
+    if (crossChainBalance > 0 || crossChainItems.length > 0) {
+      sections.push({
+        id: "cross-chain-collateral",
+        title: "CROSS-CHAIN COLLATERAL",
+        totalBalance: crossChainBalance,
+        items: crossChainItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          balance: item.balance,
+          subtitle: item.subtitle,
+          networks: item.networks,
+        })),
+        defaultExpanded: false,
+        emptyMessage: "No cross-chain collateral available",
+      });
+    }
+
+    sections.push({
+      id: "wallet-assets",
+      title: "WALLET ASSETS",
+      totalBalance: walletBalanceNum,
+      items:
+        walletBalanceNum > 0
+          ? [
+              {
+                id: "wallet-usdc",
+                name: "USDC",
+                balance: walletBalanceNum,
+                subtitle: "USD COIN",
+              },
+            ]
+          : [],
+      defaultExpanded: false,
+      emptyMessage: isConnected
+        ? "No assets in wallet"
+        : "Connect wallet to see assets",
+    });
+
+    sections.push({
+      id: "brokex-balance",
+      title: "BROKEX BALANCE",
+      totalBalance: brokexBalanceNum,
+      items:
+        brokexBalanceNum > 0
+          ? [
+              {
+                id: "brokex-usdc",
+                name: "USDC",
+                balance: brokexBalanceNum,
+                subtitle: "Available in Brokex",
+              },
+            ]
+          : [],
+      defaultExpanded: true,
+      emptyMessage: "No balance in Brokex",
+    });
+
+    return sections;
+  }, [balanceData, walletBalanceNum, brokexBalanceNum, isConnected]);
+
   const { writeContractAsync } = useWriteContract();
   const { switchChainAsync } = useSwitchChain();
-  const config = useConfig();
-  const publicClient = config.publicClient;
+  const publicClient = usePublicClient();
 
   const finalAssetIdForTx = useMemo(() => {
     const n = Number(selectedAsset.id);
@@ -369,11 +458,26 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
         });
       }
 
-      // 4. ATTENDRE LA CONFIRMATION
+      // 4. ATTENDRE LA CONFIRMATION ET LOGGER APRÈS SUCCÈS
       if (!publicClient || !txHash) {
         console.error("Wagmi public client is unavailable or txHash missing.");
       } else {
         await publicClient.waitForTransactionReceipt({ hash: txHash });
+        
+        // Log transaction to API after successful confirmation
+        if (account) {
+          const actionType = orderType === 'limit' 
+            ? (longSide ? 'LIMIT_BUY' : 'LIMIT_SELL')
+            : (longSide ? 'MARKET_BUY' : 'MARKET_SELL');
+          
+          logTransaction({
+            userAddress: account,
+            txHash: txHash,
+            actionType: actionType,
+            venue: 'brokex',
+            chainId: customChain.id,
+          });
+        }
       }
 
       const explorerUrl = txHash ? `https://atlantic.pharosscan.xyz/tx/${txHash}` : undefined;
@@ -680,6 +784,8 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
                       totalBalance: totalBalance,
                     }}
                     isLoading={balanceLoading}
+                    showDefaultSections={false}
+                    customSections={customBalanceSections}
                     onDepositClick={() => {
                       setSpiceBalanceOpen(false);
                       setTimeout(() => setSpiceDepositOpen(true), 100);
