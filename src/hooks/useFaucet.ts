@@ -123,10 +123,10 @@ export const useFaucet = () => {
           await publicClient.waitForTransactionReceipt({ hash });
           if (address) {
             logTransaction({
-              userAddress: address,
+              address: address,
               txHash: hash,
               actionType: 'FAUCET_CLAIM',
-              venue: 'brokex',
+              venue: 'BROKEX',
               chainId: customChain.id,
             });
           }
@@ -172,10 +172,10 @@ export const useFaucet = () => {
           await publicClient.waitForTransactionReceipt({ hash });
           if (address) {
             logTransaction({
-              userAddress: address,
+              address: address,
               txHash: hash,
               actionType: 'FAUCET_APPROVE',
-              venue: 'brokex',
+              venue: 'BROKEX',
               chainId: customChain.id,
             });
           }

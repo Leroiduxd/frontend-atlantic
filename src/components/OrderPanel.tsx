@@ -471,10 +471,10 @@ const OrderPanel = ({ selectedAsset, currentPrice }: OrderPanelProps) => {
             : (longSide ? 'MARKET_BUY' : 'MARKET_SELL');
           
           logTransaction({
-            userAddress: account,
+            address: account,
             txHash: txHash,
             actionType: actionType,
-            venue: 'brokex',
+            venue: 'BROKEX',
             chainId: customChain.id,
           });
         }

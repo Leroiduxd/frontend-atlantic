@@ -95,10 +95,10 @@ export const useVault = () => {
       if (publicClient) {
         await publicClient.waitForTransactionReceipt({ hash });
         logTransaction({
-          userAddress: address,
+          address: address,
           txHash: hash,
           actionType: 'APPROVE',
-          venue: 'brokex',
+          venue: 'BROKEX',
           chainId: customChain.id,
         });
       }
@@ -175,10 +175,10 @@ export const useVault = () => {
       if (publicClient) {
         await publicClient.waitForTransactionReceipt({ hash });
         logTransaction({
-          userAddress: address,
+          address: address,
           txHash: hash,
           actionType: 'DEPOSIT',
-          venue: 'brokex',
+          venue: 'BROKEX',
           chainId: customChain.id,
         });
       }
@@ -237,10 +237,10 @@ export const useVault = () => {
       if (publicClient) {
         await publicClient.waitForTransactionReceipt({ hash });
         logTransaction({
-          userAddress: address,
+          address: address,
           txHash: hash,
           actionType: 'WITHDRAW',
-          venue: 'brokex',
+          venue: 'BROKEX',
           chainId: customChain.id,
         });
       }

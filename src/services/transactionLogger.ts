@@ -1,7 +1,7 @@
 import { Hash } from 'viem';
 
 export interface VenueTxHashRequest {
-  userAddress: string; 
+  address: string; 
   txHash: Hash; 
   actionType: string;
   venue: string;
@@ -11,10 +11,10 @@ export interface VenueTxHashRequest {
 const API_ENDPOINT = "https://tx-submission-api-dev.spicenet.io/venue-tx-hashes";
 
 export const logTransaction = async (request: VenueTxHashRequest): Promise<void> => {
-  if (!request.txHash || !request.userAddress || !request.actionType || !request.venue || !request.chainId) {
+  if (!request.txHash || !request.address || !request.actionType || !request.venue || !request.chainId) {
     console.error('Missing required fields for transaction logging:', {
       hasTxHash: !!request.txHash,
-      hasUserAddress: !!request.userAddress,
+      hasaddress: !!request.address,
       hasActionType: !!request.actionType,
       hasVenue: !!request.venue,
       hasChainId: !!request.chainId,
@@ -29,10 +29,10 @@ export const logTransaction = async (request: VenueTxHashRequest): Promise<void>
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        address: request.userAddress,
+        address: request.address.toLowerCase(),
         txHash: request.txHash,
         actionType: request.actionType,
-        venue: "BROKEX",
+        venue: request.venue,
         chainId: request.chainId,
       }),
     });
@@ -44,21 +44,21 @@ export const logTransaction = async (request: VenueTxHashRequest): Promise<void>
         statusText: response.statusText,
         txHash: request.txHash,
         actionType: request.actionType,
-        userAddress: request.userAddress,
+        address: request.address,
         error: errorText,
       });
     } else {
       console.log('Transaction logged successfully:', {
         txHash: request.txHash,
         actionType: request.actionType,
-        userAddress: request.userAddress,
+        address: request.address,
       });
     }
   } catch (error) {
     console.error('Error logging transaction to API:', error, {
       txHash: request.txHash,
       actionType: request.actionType,
-      userAddress: request.userAddress,
+      address: request.address,
     });
   }
 };

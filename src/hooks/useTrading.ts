@@ -64,16 +64,16 @@ export const useTrading = () => {
     if (publicClient) {
       await publicClient.waitForTransactionReceipt({ hash });
       logTransaction({
-        userAddress: address,
+        address: address,
         txHash: hash,
         actionType: params.longSide ? 'LIMIT_BUY' : 'LIMIT_SELL',
-        venue: 'brokex',
+        venue: 'BROKEX',
         chainId: customChain.id,
       });
     }
 
     return hash;
-  };
+  }; 
   
   const openMarket = async (params: OpenPositionMarketParams) => {
     if (!address) throw new Error('No wallet connected');
@@ -99,10 +99,10 @@ export const useTrading = () => {
     if (publicClient) {
       await publicClient.waitForTransactionReceipt({ hash });
       logTransaction({
-        userAddress: address,
+        address: address,
         txHash: hash,
         actionType: params.longSide ? 'MARKET_BUY' : 'MARKET_SELL',
-        venue: 'brokex',
+        venue: 'BROKEX',
         chainId: customChain.id,
       });
     }
@@ -131,10 +131,10 @@ export const useTrading = () => {
     if (publicClient) {
       await publicClient.waitForTransactionReceipt({ hash });
       logTransaction({
-        userAddress: address,
+        address: address,
         txHash: hash,
         actionType: 'CANCEL_ORDER',
-        venue: 'brokex',
+        venue: 'BROKEX',
         chainId: customChain.id,
       });
     }
@@ -199,10 +199,10 @@ export const useTrading = () => {
         'setTP': 'UPDATE_TP',
       };
       logTransaction({
-        userAddress: address,
+        address: address,
         txHash: hash,
         actionType: actionTypeMap[functionName] || functionName,
-        venue: 'brokex',
+        venue: 'BROKEX',
         chainId: customChain.id,
       });
     }
@@ -235,10 +235,10 @@ export const useTrading = () => {
     if (publicClient) {
       await publicClient.waitForTransactionReceipt({ hash });
       logTransaction({
-        userAddress: address,
+        address: address,
         txHash: hash,
         actionType: 'CLOSE_POSITION',
-        venue: 'brokex',
+        venue: 'BROKEX',
         chainId: customChain.id,
       });
     }
