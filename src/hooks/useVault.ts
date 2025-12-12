@@ -1,4 +1,4 @@
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useConfig } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useConfig } from 'wagmi';
 import { VAULT_ADDRESS, VAULT_ABI, TOKEN_ADDRESS, TOKEN_ABI } from '@/config/contracts';
 import { formatUnits, parseUnits } from 'viem';
 import { customChain } from '@/config/wagmi';
@@ -8,7 +8,6 @@ import { logTransaction } from '@/services/transactionLogger';
 export const useVault = () => {
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
-  const publicClient = usePublicClient();
   const config = useConfig();
 
   // Read vault balances
@@ -91,17 +90,19 @@ export const useVault = () => {
         chain: customChain,
       });
 
-      // Wait for transaction confirmation, then log
-      if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash });
-        logTransaction({
-          address: address,
-          txHash: hash,
-          actionType: 'APPROVE',
-          venue: 'BROKEX',
-          chainId: customChain.id,
-        });
-      }
+      // Wait for transaction confirmation using wagmi core
+      await waitForTransactionReceipt(config, {
+        hash,
+        confirmations: 1,
+      });
+      
+      logTransaction({
+        address: address,
+        txHash: hash,
+        actionType: 'APPROVE',
+        venue: 'BROKEX',
+        chainId: customChain.id,
+      });
 
       return hash;
     } catch (error: unknown) {
@@ -148,12 +149,14 @@ export const useVault = () => {
     if (!allowanceValue || allowanceValue < amountInWei) {
       const approvalHash = await approveToken(amount);
       
+      console.log('Approval hash:', approvalHash);
       // Wait for approval transaction to be confirmed
       await waitForTransactionReceipt(config, {
         hash: approvalHash,
         confirmations: 1,
       });
       
+      console.log('Approval confirmed');
       // Wait a bit for state to propagate
       await new Promise(resolve => setTimeout(resolve, 1000));
       
@@ -161,6 +164,11 @@ export const useVault = () => {
       await refetchAllowance();
     }
 
+    console.log('Depositing:', {
+      amount,
+      amountInWei: amountInWei.toString(),
+      allowanceValue: allowanceValue.toString(),
+    });
     try {
       const hash = await writeContractAsync({
         address: VAULT_ADDRESS,
@@ -171,17 +179,21 @@ export const useVault = () => {
         chain: customChain,
       });
 
-      // Wait for transaction confirmation, then log
-      if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash });
-        logTransaction({
-          address: address,
-          txHash: hash,
-          actionType: 'DEPOSIT',
-          venue: 'BROKEX',
-          chainId: customChain.id,
-        });
-      }
+      console.log('Deposit hash:', hash);
+      
+      // Wait for transaction confirmation using wagmi core
+      await waitForTransactionReceipt(config, {
+        hash,
+        confirmations: 1,
+      });
+      
+      logTransaction({
+        address: address,
+        txHash: hash,
+        actionType: 'DEPOSIT',
+        venue: 'BROKEX',
+        chainId: customChain.id,
+      });
 
       return hash;
     } catch (error: unknown) {
@@ -233,17 +245,19 @@ export const useVault = () => {
         chain: customChain,
       });
 
-      // Wait for transaction confirmation, then log
-      if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash });
-        logTransaction({
-          address: address,
-          txHash: hash,
-          actionType: 'WITHDRAW',
-          venue: 'BROKEX',
-          chainId: customChain.id,
-        });
-      }
+      // Wait for transaction confirmation using wagmi core
+      await waitForTransactionReceipt(config, {
+        hash,
+        confirmations: 1,
+      });
+      
+      logTransaction({
+        address: address,
+        txHash: hash,
+        actionType: 'WITHDRAW',
+        venue: 'BROKEX',
+        chainId: customChain.id,
+      });
 
       return hash;
     } catch (error: unknown) {

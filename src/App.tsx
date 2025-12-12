@@ -17,16 +17,16 @@ const queryClient = new QueryClient();
 
 const App = () => (
   // 🛑 1. QueryClientProvider (Doit être en haut pour le cache)
-  <QueryClientProvider client={queryClient}> 
+  <QueryClientProvider client={queryClient}>
     {/* 🛑 2. WagmiProvider (Doit être en dessous de QueryClient) */}
-    <WagmiProvider config={config}> 
+    <WagmiProvider config={config}>
       {/* 🛑 3. RainbowKitProvider (Doit être en dessous de Wagmi) */}
-      <RainbowKitProvider> 
+      <RainbowKitProvider>
         <PrivyProvider appId="cmebl077a0160l40a7xpxcv84">
-          <SpiceFlowProvider 
+          <SpiceFlowProvider
             provider="privy"
             privyAppId="cmebl077a0160l40a7xpxcv84"
-            supportedChainIds={[84532, 688689,5115 ,421614, 11155111]}
+            supportedChainIds={[84532, 688689, 421614]}
             nativeChainId={688689}
             nonEip7702Mode={true}
             appName="Brokex"
